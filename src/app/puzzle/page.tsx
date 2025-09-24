@@ -1,13 +1,11 @@
 // app/puzzle/page.tsx
-
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import Image from 'next/image'
-import { useSearchParams } from 'next/navigation'
 
-// ---------------- Types ----------------
+/* ===================== Types ===================== */
 interface Tile {
   id: number
   row: number
@@ -22,7 +20,7 @@ interface Tile {
 interface Edges { top: number; right: number; bottom: number; left: number }
 type Rect = { x: number; y: number; w: number; h: number }
 
-// ---------------- Utils ----------------
+/* ===================== Utils ===================== */
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
 const range = (n: number) => Array.from({ length: n }, (_, i) => i)
 const isEdge = (r: number, c: number, rows: number, cols: number) => r === 0 || c === 0 || r === rows - 1 || c === cols - 1
@@ -44,6 +42,8 @@ function hashString(s: string) {
   }
   return (h >>> 0) || 1
 }
+
+// edges grid 만들기
 function buildEdges(rows: number, cols: number, rng: () => number): Edges[][] {
   const edges: Edges[][] = Array.from({ length: rows }, () =>
     Array.from({ length: cols }, () => ({ top: 0, right: 0, bottom: 0, left: 0 })),
@@ -51,14 +51,16 @@ function buildEdges(rows: number, cols: number, rng: () => number): Edges[][] {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const e = edges[r][c]
-      if (r === 0) e.top = 0; else e.top = -edges[r - 1][c].bottom
-      if (c === 0) e.left = 0; else e.left = -edges[r][c - 1].right
-      if (c === cols - 1) e.right = 0; else e.right = rng() > 0.5 ? 1 : -1
-      if (r === rows - 1) e.bottom = 0; else e.bottom = rng() > 0.5 ? 1 : -1
+      e.top = r === 0 ? 0 : -edges[r - 1][c].bottom
+      e.left = c === 0 ? 0 : -edges[r][c - 1].right
+      e.right = c === cols - 1 ? 0 : rng() > 0.5 ? 1 : -1
+      e.bottom = r === rows - 1 ? 0 : rng() > 0.5 ? 1 : -1
     }
   }
   return edges
 }
+
+// SVG path 생성
 function buildPiecePath(w: number, h: number, e: Edges, knob = Math.min(w, h) * 0.22): string {
   const k = knob, cw = w / 2, ch = h / 2, c = k * 0.552
   const top = (s: number) => !s ? `L ${w} 0` : [
@@ -88,197 +90,187 @@ function buildPiecePath(w: number, h: number, e: Edges, knob = Math.min(w, h) * 
   return [`M 0 0`, top(e.top), right(e.right), bottom(e.bottom), left(e.left)].join(' ')
 }
 
-// ---------- Non-overlapping spawn positions ----------
+/* ---- 시작 시 겹치지 않게 흩뿌리기 ---- */
 type Spawn = { x: number; y: number }
-type RectOnly = { x: number; y: number; w: number; h: number }
-const rectsOverlap = (a: RectOnly, b: RectOnly, gap: number) =>
-  !(
-    a.x + a.w + gap <= b.x ||
-    b.x + b.w + gap <= a.x ||
-    a.y + a.h + gap <= b.y ||
-    b.y + b.h + gap <= a.y
-  )
-
-function shuffleInPlace<T>(arr: T[], rng: () => number) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j], arr[i]]
-  }
-}
+type R = { x: number; y: number; w: number; h: number }
+const overlap = (a: R, b: R, gap: number) =>
+  !((a.x + a.w + gap) <= b.x || (b.x + b.w + gap) <= a.x || (a.y + a.h + gap) <= b.y || (b.y + b.h + gap) <= a.y)
 
 function generateNonOverlappingSpawnPositions(
-  outerW: number,
-  outerH: number,
-  play: Rect,
-  tileW: number,
-  tileH: number,
-  count: number,
-  rng: () => number,
+  outerW: number, outerH: number, play: Rect,
+  tileW: number, tileH: number, count: number, rng: () => number
 ): Spawn[] {
   const gapBase = Math.max(10, Math.round(Math.min(tileW, tileH) * 0.12))
-  const bands: RectOnly[] = [
+  // 플레이 영역 바깥의 4방향 밴드
+  const bands: R[] = [
     { x: 0, y: 0, w: Math.max(0, play.x), h: outerH },
     { x: play.x + play.w, y: 0, w: Math.max(0, outerW - (play.x + play.w)), h: outerH },
     { x: 0, y: 0, w: outerW, h: Math.max(0, play.y) },
     { x: 0, y: play.y + play.h, w: outerW, h: Math.max(0, outerH - (play.y + play.h)) },
   ]
-  const candidates: RectOnly[] = []
+  const candidates: R[] = []
   for (const b of bands) {
     if (b.w <= 0 || b.h <= 0) continue
-    const stepX = tileW + gapBase, stepY = tileH + gapBase
+    const stepX = tileW + gapBase
+    const stepY = tileH + gapBase
     for (let y = b.y; y <= b.y + b.h - tileH; y += stepY) {
       for (let x = b.x; x <= b.x + b.w - tileW; x += stepX) {
         candidates.push({ x, y, w: tileW, h: tileH })
       }
     }
   }
-  shuffleInPlace(candidates, rng)
-  const out: RectOnly[] = []
-  const trySelect = (rects: RectOnly[], gap: number) => {
-    for (const r of rects) {
+  // 섞기
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    const tmp = candidates[i]; candidates[i] = candidates[j]; candidates[j] = tmp
+  }
+
+  const out: R[] = []
+  const tryPick = (gap: number) => {
+    for (const r of candidates) {
       if (out.length >= count) break
-      let ok = true
-      for (const c of out) { if (rectsOverlap(c, r, gap)) { ok = false; break } }
+      let ok = !overlap(r, play, 0)
+      if (ok) for (const c of out) { if (overlap(c, r, gap)) { ok = false; break } }
       if (ok) out.push(r)
     }
   }
-  trySelect(candidates, gapBase)
+  tryPick(gapBase)
   let gap = gapBase
-  while (out.length < count && gap > 2) { gap = Math.floor(gap * 0.7); trySelect(candidates, gap) }
-  let guard = 6000
-  while (out.length < count && guard-- > 0) {
-    const x = Math.floor(rng() * (outerW - tileW))
-    const y = Math.floor(rng() * (outerH - tileH))
-    const r = { x, y, w: tileW, h: tileH }
-    if (rectsOverlap(r, play, 0)) continue
+  while (out.length < count && gap > 2) { gap = Math.floor(gap * 0.7); tryPick(gap) }
+
+  // 부족하면 랜덤 보정
+  let guard = 4000
+  while (out.length < count && guard--) {
+    const r: R = { x: Math.floor(rng() * (outerW - tileW)), y: Math.floor(rng() * (outerH - tileH)), w: tileW, h: tileH }
+    if (overlap(r, play, 0)) continue
     let ok = true
-    for (const c of out) { if (rectsOverlap(c, r, 4)) { ok = false; break } }
+    for (const c of out) { if (overlap(c, r, 4)) { ok = false; break } }
     if (ok) out.push(r)
   }
   return out.slice(0, count).map(({ x, y }) => ({ x, y }))
 }
 
-// ---------------- Component ----------------
+/* ===================== Component ===================== */
 export default function PuzzlePage() {
-  // Core state
-  const [imageUrl, setImageUrl] = useState<string>('')
-  const [cols, setCols] = useState(4)
+  // URL에서 이미지/난이도 읽어서 초기 세팅
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [rows, setRows] = useState(4)
+  const [cols, setCols] = useState(4)
 
-  // Background (play area only)
+  useEffect(() => {
+    // 클라이언트에서만 실행
+    const sp = new URLSearchParams(window.location.search)
+    const img = sp.get('image')
+    if (img) setImageUrl(decodeURIComponent(img))
+    const diff = Number(sp.get('difficulty') || '')
+    if (diff && Number.isFinite(diff)) {
+      const n = Math.sqrt(diff)
+      if (Number.isInteger(n) && n >= 2 && n <= 10) {
+        setRows(n); setCols(n)
+      }
+    }
+    // 이미지 없으면 기본값
+    if (!img) {
+      setImageUrl('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop')
+    }
+  }, [])
+
+  // UI 상태들
   const [bgOpacity, setBgOpacity] = useState(0.35)
   const [bgBlur, setBgBlur] = useState(true)
-
-  const [snapTolerance, setSnapTolerance] = useState(25)
+  const [snapTolerance, setSnapTolerance] = useState(50)
   const [boardScale, setBoardScale] = useState(1)
   const [showGuides, setShowGuides] = useState(true)
-
-  // UX toggles
   const [edgesOnly, setEdgesOnly] = useState(false)
   const [rotationMode, setRotationMode] = useState(false)
   const [captureMode, setCaptureMode] = useState(false)
 
-  // Timer
+  // 타이머
   const [paused, setPaused] = useState(false)
   const [elapsed, setElapsed] = useState(0)
 
-  // Layout
+  // 레이아웃/보드
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [outerRect, setOuterRect] = useState({ w: 1100, h: 800 })
-  const playSize = useMemo(
-    () => Math.min(640, Math.max(400, Math.floor(Math.min(outerRect.w, outerRect.h) * 0.6))),
-    [outerRect.w, outerRect.h],
-  )
+  useEffect(() => {
+  const update = () => {
+    if (!boardRef.current) return
+    const r = boardRef.current.getBoundingClientRect()
+    setOuterRect({ w: Math.round(r.width), h: Math.round(r.height) })
+  }
+
+  update()
+
+  const ro = new ResizeObserver(update)
+  const el = boardRef.current
+  if (el) ro.observe(el)
+
+  return () => {
+    if (el) ro.unobserve(el)
+    ro.disconnect()
+  }
+}, [])
+
+
+  // 중앙 플레이 영역
+  const playSize = Math.min(640, Math.max(400, Math.floor(Math.min(outerRect.w, outerRect.h) * 0.6)))
   const playW = playSize, playH = playSize
   const playX = Math.floor((outerRect.w - playW) / 2)
   const playY = Math.floor((outerRect.h - playH) / 2)
-const playRect: Rect = useMemo(
-  () => ({ x: playX, y: playY, w: playW, h: playH }),
-  [playX, playY, playW, playH]
-)
+  const playRect: Rect = useMemo(() => ({ x: playX, y: playY, w: playW, h: playH }), [playX, playY, playW, playH])
 
-  // Tiles
+  // 타일 크기/그리드
   const tileW = Math.floor(playW / cols)
   const tileH = Math.floor(playH / rows)
+
   const [tiles, setTiles] = useState<Tile[]>([])
   const [dragging, setDragging] = useState<{ ids: number[]; anchor: { dx: number; dy: number }[] } | null>(null)
 
+  // 엣지 모양 고정
   const edgesGrid = useMemo(() => {
     const seed = hashString(`${imageUrl}|${rows}x${cols}`)
     const rng = mulberry32(seed)
     return buildEdges(rows, cols, rng)
   }, [imageUrl, rows, cols])
 
-  // Non-overlap spawn + shuffle
+  // 스폰 위치 생성 & 섞기
   const clampIntoBoard = useCallback((x: number, y: number) => ({
     x: clamp(x, 0, outerRect.w - tileW),
     y: clamp(y, 0, outerRect.h - tileH),
   }), [outerRect.w, outerRect.h, tileW, tileH])
 
   const shuffle = useCallback(() => {
-  if (!imageUrl) return
-  const total = rows * cols
-  const seed = hashString(
-    `spawn|${outerRect.w}x${outerRect.h}|${playRect.x},${playRect.y},${playRect.w}x${playRect.h}|${rows}x${cols}`
-  )
-  const rng = mulberry32(seed)
-  const spawns = generateNonOverlappingSpawnPositions(
-    outerRect.w, outerRect.h, playRect, tileW, tileH, total, rng
-  )
+    if (!imageUrl) return
+    const total = rows * cols
+    const seed = hashString(`spawn|${outerRect.w}x${outerRect.h}|${playRect.x},${playRect.y},${playRect.w}x${playRect.h}|${rows}x${cols}`)
+    const rng = mulberry32(seed)
+    const spawns = generateNonOverlappingSpawnPositions(outerRect.w, outerRect.h, playRect, tileW, tileH, total, rng)
 
-  const init = range(rows).flatMap(r =>
-    range(cols).map(c => {
-      const id = r * cols + c
-      const pos = spawns[id] || {
-        x: Math.random() * (outerRect.w - tileW),
-        y: Math.random() * (outerRect.h - tileH),
-      }
-      const clamped = clampIntoBoard(pos.x, pos.y)
-      return { id, row: r, col: c, x: clamped.x, y: clamped.y, angle: 0, locked: false, groupId: id } as Tile
-    }),
-  )
-  setTiles(init)
-  setElapsed(0)
-  setPaused(false)
-}, [
-  imageUrl, rows, cols,
-  outerRect.w, outerRect.h,
-  playRect,            // ✅ 메모이즈된 객체만 사용
-  tileW, tileH,
-  clampIntoBoard
-])
+    const init = range(rows).flatMap(r =>
+      range(cols).map(c => {
+        const id = r * cols + c
+        const pos = spawns[id] || { x: Math.random() * (outerRect.w - tileW), y: Math.random() * (outerRect.h - tileH) }
+        const cl = clampIntoBoard(pos.x, pos.y)
+        return { id, row: r, col: c, x: cl.x, y: cl.y, angle: 0, locked: false, groupId: id } as Tile
+      }),
+    )
+    setTiles(init)
+    setElapsed(0)
+    setPaused(false)
+  }, [imageUrl, rows, cols, outerRect.w, outerRect.h, playRect, tileW, tileH, clampIntoBoard])
 
-
-  // Resize observer
-  useEffect(() => {
-    const update = () => {
-      if (!boardRef.current) return
-      const r = boardRef.current.getBoundingClientRect()
-      setOuterRect({ w: Math.round(r.width), h: Math.round(r.height) })
-    }
-    update()
-    const ro = new ResizeObserver(update)
-    if (boardRef.current) ro.observe(boardRef.current)
-    return () => ro.disconnect()
-  }, [])
-
-  // Shuffle when grid/image changes
+  // 이미지/난이도 바뀌면 섞기
   useEffect(() => { shuffle() }, [shuffle])
 
-  // Default image
-  useEffect(() => {
-    if (!imageUrl) setImageUrl('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop')
-  }, [imageUrl])
-
-  // Solved
+  // 완료 여부
   const solved = useMemo(
     () => tiles.length > 0 && tiles.length === rows * cols && tiles.every(t => t.locked),
     [tiles, rows, cols],
   )
 
-  // Timer
+  // 타이머
   useEffect(() => {
-    let raf: number
+    let raf = 0
     let last = performance.now()
     const loop = () => {
       const now = performance.now()
@@ -290,7 +282,7 @@ const playRect: Rect = useMemo(
     return () => cancelAnimationFrame(raf)
   }, [paused, solved])
 
-  // Keyboard
+  // 단축키
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'c') setCaptureMode(v => !v)
@@ -306,63 +298,24 @@ const playRect: Rect = useMemo(
     return () => window.removeEventListener('keydown', onKey)
   }, [rotationMode, shuffle])
 
-  // Actions
+  /* ---------------- Actions ---------------- */
   function toggleSelect(id: number) {
     setTiles(prev => {
       const me = prev.find(t => t.id === id)
       if (!me) return prev
       const gid = me.groupId
-      const willSelect = !me.selected
-      return prev.map(t => (t.groupId === gid ? { ...t, selected: willSelect } : t))
+      const will = !me.selected
+      return prev.map(t => (t.groupId === gid ? { ...t, selected: will } : t))
     })
   }
   function rotateSelected(delta: number) {
     setTiles(prev => prev.map(t => (t.selected && !t.locked ? { ...t, angle: (t.angle + delta + 360) % 360 } : t)))
   }
 
-  // Finalize when full group assembled (anywhere)
-  function finalizeIfAssembled(next: Tile[]) {
-    const total = rows * cols
-    const groups = new Map<number, Tile[]>()
-    for (const t of next) { const arr = groups.get(t.groupId); if (arr) arr.push(t); else groups.set(t.groupId, [t]) }
-    const tol = Math.max(25, Math.min(tileW, tileH) * 0.35)
-
-    for (const [, group] of groups) {
-      if (group.length !== total) continue
-      const a0 = norm(group[0].angle)
-      if (!group.every(t => norm(t.angle) === a0)) continue
-      if (a0 !== 0) continue
-
-      const baseX = group[0].x - group[0].col * tileW
-      const baseY = group[0].y - group[0].row * tileH
-      const fitsGrid = group.every(t =>
-        Math.abs(t.x - (baseX + t.col * tileW)) <= tol &&
-        Math.abs(t.y - (baseY + t.row * tileH)) <= tol
-      )
-      if (!fitsGrid) continue
-
-      const dx = playX - baseX
-      const dy = playY - baseY
-      const ids = new Set(group.map(t => t.id))
-      next = next.map(t =>
-        ids.has(t.id)
-          ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy), angle: 0, locked: true, selected: false }
-          : t
-      )
-      break
-    }
-    next = next.map(t => {
-      const c = clampIntoBoard(t.x, t.y)
-      return { ...t, x: c.x, y: c.y }
-    })
-    return next
-  }
-
-  // Pointer handlers
+  // 드래그
   const onPointerDown = (e: React.PointerEvent, id: number) => {
-    const board = boardRef.current
-    if (!board) return
-    const rect = board.getBoundingClientRect()
+    if (!boardRef.current) return
+    const rect = boardRef.current.getBoundingClientRect()
     const px = e.clientX - rect.left
     const py = e.clientY - rect.top
 
@@ -373,8 +326,7 @@ const playRect: Rect = useMemo(
 
       if (captureMode) next = next.map(x => (x.id === id ? { ...x, selected: !x.selected } : x))
       else {
-        const me = next.find(x => x.id === id)!
-        const gid = me.groupId
+        const gid = t.groupId
         next = next.map(x => ({ ...x, selected: x.groupId === gid }))
       }
 
@@ -382,17 +334,13 @@ const playRect: Rect = useMemo(
       const anchors = group.map(g => ({ dx: px - g.x, dy: py - g.y }))
       setDragging({ ids: group.map(g => g.id), anchor: anchors })
 
-      // 표준 DOM API 사용(추가 타입 선언 불필요)
-      ;(e.target as Element | null)?.setPointerCapture?.(e.pointerId)
+      ;(e.target as Element)?.setPointerCapture?.(e.pointerId)
       return next
     })
   }
-
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging) return
-    const board = boardRef.current
-    if (!board) return
-    const rect = board.getBoundingClientRect()
+    if (!dragging || !boardRef.current) return
+    const rect = boardRef.current.getBoundingClientRect()
     const px = e.clientX - rect.left
     const py = e.clientY - rect.top
 
@@ -410,9 +358,6 @@ const playRect: Rect = useMemo(
       })
     })
   }
-
-  const isComplement = (a: number, b: number) => a !== 0 && a === -b
-
   const onPointerUp = () => {
     if (!dragging) return
     const ids = dragging.ids
@@ -421,7 +366,7 @@ const playRect: Rect = useMemo(
     setTiles(prev => {
       let next = prev
 
-      // 1) Slot snap
+      // 1) 슬롯 스냅
       next = next.map(t => {
         if (!ids.includes(t.id) || t.locked) return t
         const slotX = playX + t.col * tileW
@@ -435,7 +380,7 @@ const playRect: Rect = useMemo(
         return { ...t, x: cl.x, y: cl.y, angle: 0, locked: true, selected: false }
       })
 
-      // 2) Group merging (bidirectional complement check)
+      // 2) 그룹 결합(인터락)
       const idSet = new Set(ids)
       const getByRC = (r: number, c: number) => next.find(tt => tt.row === r && tt.col === c)
       const tryMergePair = (a: Tile, b: Tile, dir: 'R' | 'L' | 'T' | 'B') => {
@@ -443,28 +388,25 @@ const playRect: Rect = useMemo(
         if ((a.angle % 360) !== (b.angle % 360)) return false
         const eA = edgesGrid[a.row][a.col], eB = edgesGrid[b.row][b.col]
         const ok =
-          (dir === 'R' && isComplement(eA.right,  eB.left))   ||
-          (dir === 'L' && isComplement(eA.left,   eB.right))  ||
-          (dir === 'T' && isComplement(eA.top,    eB.bottom)) ||
-          (dir === 'B' && isComplement(eA.bottom, eB.top))
+          (dir === 'R' && eA.right === 1 && eB.left === -1) ||
+          (dir === 'L' && eA.left === -1 && eB.right === 1) ||
+          (dir === 'T' && eA.top === -1 && eB.bottom === 1) ||
+          (dir === 'B' && eA.bottom === 1 && eB.top === -1)
         if (!ok) return false
 
-        const expect =
-          dir === 'R' ? { dx: tileW,  dy: 0 } :
-          dir === 'L' ? { dx: -tileW, dy: 0 } :
-          dir === 'T' ? { dx: 0,      dy: -tileH } :
-                        { dx: 0,      dy: tileH }
+        const expect = dir === 'R' ? { dx: tileW, dy: 0 } :
+                       dir === 'L' ? { dx: -tileW, dy: 0 } :
+                       dir === 'T' ? { dx: 0, dy: -tileH } : { dx: 0, dy: tileH }
 
         const ddx = Math.abs(b.x - a.x - expect.dx)
         const ddy = Math.abs(b.y - a.y - expect.dy)
-        const tol = Math.max(30, Math.min(tileW, tileH) * 0.35)
+        const tol = Math.max(30, Math.min(tileW, tileH) * 0.35) // 관대하게
         if (ddx > tol || ddy > tol) return false
 
         const from = b.groupId, to = a.groupId
         const offsetX = a.x + expect.dx - b.x
         const offsetY = a.y + expect.dy - b.y
         next = next.map(t => (t.groupId === from ? { ...t, groupId: to, x: t.x + offsetX, y: t.y + offsetY, angle: a.angle } : t))
-        // keep inside board
         next = next.map(t => (t.groupId === to ? { ...t, ...clampIntoBoard(t.x, t.y) } : t))
         return true
       }
@@ -488,12 +430,41 @@ const playRect: Rect = useMemo(
         for (const i of expanded) idSet.add(i)
       }
 
-      // 3) Final assembly detection
-      next = finalizeIfAssembled(next)
+      // 3) 전체 조립되었으면 중앙으로 스냅
+      const total = rows * cols
+      const groups = new Map<number, Tile[]>()
+      for (const t of next) {
+  const id = t.groupId
+  const arr = groups.get(id)
+  if (arr) {
+    arr.push(t)
+  } else {
+    groups.set(id, [t])
+  }
+}
+      const tolAll = Math.max(25, Math.min(tileW, tileH) * 0.35)
+      for (const [, group] of groups) {
+        if (group.length !== total) continue
+        const a0 = norm(group[0].angle)
+        if (!group.every(t => norm(t.angle) === a0) || a0 !== 0) continue
+        const baseX = group[0].x - group[0].col * tileW
+        const baseY = group[0].y - group[0].row * tileH
+        const fits = group.every(t =>
+          Math.abs(t.x - (baseX + t.col * tileW)) <= tolAll &&
+          Math.abs(t.y - (baseY + t.row * tileH)) <= tolAll,
+        )
+        if (!fits) continue
+        const dx = playX - baseX, dy = playY - baseY
+        const ids = new Set(group.map(t => t.id))
+        next = next.map(t => ids.has(t.id) ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy), angle: 0, locked: true, selected: false } : t)
+        break
+      }
+
       return next.sort((a, b) => Number(a.locked) - Number(b.locked))
     })
   }
 
+  // 휠 회전/탭 회전
   const onWheel = (e: React.WheelEvent, id: number) => {
     if (!rotationMode) return
     e.preventDefault()
@@ -504,12 +475,7 @@ const playRect: Rect = useMemo(
     if (rotationMode) setTiles(prev => prev.map(t => (t.id === id || (t.selected && !t.locked)) ? { ...t, angle: (t.angle + 90) % 360 } : t))
   }
 
-  const presets = [
-    { label: 'Vibrant Vibes', url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop' },
-    { label: 'Mountains', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop' },
-    { label: 'City Night', url: 'https://images.unsplash.com/photo-1482192596544-9eb780fc7f66?q=80&w=1600&auto=format&fit=crop' },
-  ]
-
+  // SVG 준비
   const knob = Math.min(tileW, tileH) * 0.22
   const pad = Math.round(knob + 6)
   const piecePaths = useMemo(
@@ -517,26 +483,16 @@ const playRect: Rect = useMemo(
     [rows, cols, tileW, tileH, edgesGrid, knob],
   )
 
+  /* ---------------- Render ---------------- */
   return (
     <div className="min-h-screen w-full bg-gray-50">
-      {/* 검색 파라미터 → 상태 반영 (Suspense 필요) */}
-      <Suspense fallback={null}>
-        <ParamsLoader onApply={(img, diff, rc) => {
-          if (img) setImageUrl(img)
-          if (typeof diff === 'number' && diff > 0) {
-            const g = Math.round(Math.sqrt(diff))
-            if (g * g === diff) { setRows(g); setCols(g) }
-          }
-          if (rc) { const { r, c } = rc; if (r > 0 && c > 0) { setRows(r); setCols(c) } }
-        }} />
-      </Suspense>
-
       <style jsx global>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes celebration { 0% { transform: scale(0.5) rotate(-5deg); opacity: 0; } 50% { transform: scale(1.1) rotate(2deg); opacity: 1; } 100% { transform: scale(1.05) rotate(0deg); opacity: 1; } }
       `}</style>
 
       <div className="mx-auto max-w-[1400px] px-4 py-6">
+        {/* Header */}
         <header className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-black px-2 py-1 text-xs font-semibold text-white">🧩 Puzzle</div>
@@ -546,7 +502,8 @@ const playRect: Rect = useMemo(
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select className="rounded-md border px-2 py-1 text-sm" value={`${cols}x${rows}`} onChange={(e) => { const [c, r] = e.target.value.split('x').map(Number); setCols(c); setRows(r) }}>
+            <select className="rounded-md border px-2 py-1 text-sm" value={`${cols}x${rows}`}
+              onChange={(e) => { const [c, r] = e.target.value.split('x').map(Number); setCols(c); setRows(r) }}>
               <option value="2x2">2 × 2</option>
               <option value="3x3">3 × 3</option>
               <option value="4x4">4 × 4</option>
@@ -555,17 +512,21 @@ const playRect: Rect = useMemo(
 
             <label className="flex items-center gap-2 text-sm">
               Snap(px)
-              <input type="number" min={10} max={50} value={snapTolerance} onChange={(e) => setSnapTolerance(Number(e.target.value))} className="w-20 rounded-md border px-2 py-1 text-sm" />
+              <input type="number" min={10} max={100} value={snapTolerance}
+                onChange={(e) => setSnapTolerance(Number(e.target.value))}
+                className="w-20 rounded-md border px-2 py-1 text-sm" />
             </label>
 
             <label className="flex items-center gap-2 text-sm">
               Scale
-              <input type="range" min={0.6} max={1.4} step={0.05} value={boardScale} onChange={(e) => setBoardScale(Number(e.target.value))} />
+              <input type="range" min={0.6} max={1.4} step={0.05} value={boardScale}
+                onChange={(e) => setBoardScale(Number(e.target.value))} />
             </label>
 
             <label className="flex items-center gap-2 text-sm">
               배경 불투명도
-              <input type="range" min={0} max={1} step={0.05} value={bgOpacity} onChange={(e) => setBgOpacity(Number(e.target.value))} />
+              <input type="range" min={0} max={1} step={0.05} value={bgOpacity}
+                onChange={(e) => setBgOpacity(Number(e.target.value))} />
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={bgBlur} onChange={(e) => setBgBlur(e.target.checked)} />
@@ -577,21 +538,10 @@ const playRect: Rect = useMemo(
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={captureMode} onChange={(e) => setCaptureMode(e.target.checked)} />Capture</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />Guides</label>
 
-            <button onClick={shuffle} className="rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!imageUrl}>섞기</button>
+            <button onClick={shuffle} className="rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800">섞기</button>
             <button onClick={() => setPaused(v => !v)} className="rounded-lg border px-3 py-1.5 text-sm">{paused ? '재개' : '일시정지'}</button>
           </div>
         </header>
-
-        <div className="mb-3 flex flex-wrap gap-2">
-          {[
-            { label: 'Vibrant Vibes', url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop' },
-            { label: 'Mountains', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop' },
-            { label: 'City Night', url: 'https://images.unsplash.com/photo-1482192596544-9eb780fc7f66?q=80&w=1600&auto=format&fit=crop' },
-          ].map((p) => (
-            <button key={p.label} onClick={() => setImageUrl(p.url)} className={`rounded-md border px-2 py-1 text-sm ${imageUrl === p.url ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}`}>{p.label}</button>
-          ))}
-          <div className="text-xs text-gray-500">단축키: c(캡처), r(섞기), p(타이머), g(가이드), ←/→(회전)</div>
-        </div>
 
         {/* Board */}
         <div className="overflow-auto rounded-2xl border bg-neutral-100 p-4 shadow-md">
@@ -602,49 +552,46 @@ const playRect: Rect = useMemo(
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
           >
-            {/* Play area background (next/image) */}
-            {imageUrl && (
-              <div
-                className="absolute rounded-xl overflow-hidden"
-                style={{ left: playX, top: playY, width: playW, height: playH, opacity: bgOpacity, filter: bgBlur ? 'blur(2px) brightness(0.9) saturate(0.95)' : 'none' }}
-              >
-                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                  <Image
-                    src={imageUrl}
-                    alt="puzzle background"
-                    fill
-                    unoptimized
-                    sizes={`${playW}px`}
-                    style={{ objectFit: 'cover' }}
-                    priority
-                  />
-                </div>
-              </div>
-            )}
+            {/* 중앙 플레이 영역 배경 */}
+            <div
+  className="absolute rounded-xl overflow-hidden"
+  style={{
+    left: playX,
+    top: playY,
+    width: playW,
+    height: playH,
+    // 래퍼에 두면 이미지/타일 위에 동일하게 적용됩니다.
+    opacity: bgOpacity,
+    filter: bgBlur ? 'blur(2px) brightness(0.9) saturate(0.95)' : 'none',
+  }}
+>
+  {/* 부모가 fill을 쓰니 position:relative가 필요합니다 */}
+  <div className="relative" style={{ width: '100%', height: '100%' }}>
+    {imageUrl && (
+      <Image
+        src={imageUrl}
+        alt="puzzle background"
+        fill                // 부모 박스를 가득 채움
+        sizes={`${playW}px`} // LCP 최적화를 위한 힌트
+        style={{ objectFit: 'cover', objectPosition: 'center' }}
+        priority            // 배경이라면 LCP에 유리
+        unoptimized={imageUrl.startsWith('blob:')} // 업로드(blob:)는 최적화 비활성화
+      />
+    )}
+  </div>
+</div>
 
-            {/* Placeholder when no image */}
-            {!imageUrl && (
-              <div className="absolute rounded-xl border-2 border-dashed border-gray-400 bg-gray-100 flex items-center justify-center" style={{ left: playX, top: playY, width: playW, height: playH }}>
-                <div className="text-center text-gray-500">
-                  <div className="text-4xl mb-2">📷</div>
-                  <div className="text-sm">이미지를 선택하거나 프리셋을 눌러주세요</div>
-                </div>
-              </div>
-            )}
-
-            {/* Play area border */}
+            {/* 플레이 영역 외곽선 & 그리드 */}
             <div className="absolute rounded-xl border-2 border-dashed" style={{ left: playX, top: playY, width: playW, height: playH, borderColor: 'rgba(0,0,0,0.35)' }} />
-
-            {/* Grid guide */}
             {showGuides && (
               <div className="pointer-events-none absolute" style={{ left: playX, top: playY, width: playW, height: playH }}>
-                {range(rows + 1).map((r) => (<div key={`r-${r}`} className="absolute left-0 right-0 border-t" style={{ top: r * tileH, borderColor: 'rgba(255,255,255,0.55)' }} />))}
-                {range(cols + 1).map((c) => (<div key={`c-${c}`} className="absolute top-0 bottom-0 border-l" style={{ left: c * tileW, borderColor: 'rgba(255,255,255,0.55)' }} />))}
+                {range(rows + 1).map(r => (<div key={`r-${r}`} className="absolute left-0 right-0 border-t" style={{ top: r * tileH, borderColor: 'rgba(255,255,255,0.55)' }} />))}
+                {range(cols + 1).map(c => (<div key={`c-${c}`} className="absolute top-0 bottom-0 border-l" style={{ left: c * tileW, borderColor: 'rgba(255,255,255,0.55)' }} />))}
               </div>
             )}
 
-            {/* Tiles */}
-            {imageUrl && tiles.map((t) => {
+            {/* 타일들 */}
+            {tiles.map(t => {
               if (edgesOnly && !isEdge(t.row, t.col, rows, cols) && !t.locked) return null
               const pathD = piecePaths[t.id]
               const clipId = `clip-${rows}-${cols}-${t.id}`
@@ -671,32 +618,40 @@ const playRect: Rect = useMemo(
                   >
                     <defs><clipPath id={clipId} clipPathUnits="userSpaceOnUse"><path d={pathD} /></clipPath></defs>
                     <g clipPath={`url(#${clipId})`}>
-                      <image href={imageUrl} x={imgX} y={imgY} width={playW} height={playH} preserveAspectRatio="xMidYMid slice" />
-                    </g>
+  {imageUrl ? (
+    <image
+      href={imageUrl}
+      x={imgX}
+      y={imgY}
+      width={playW}
+      height={playH}
+      preserveAspectRatio="xMidYMid slice"
+    />
+  ) : null}
+</g>
+
                     <path d={pathD} fill="none" stroke={stroke} strokeWidth={t.selected ? 2 : 1} />
                   </svg>
                 </div>
               )
             })}
 
-            {/* Completion popup */}
+            {/* 완료 팝업 */}
             {solved && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-50">
                 <div className="relative">
-                  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm animate-pulse" style={{ animation: 'fadeIn 0.5s ease-out' }} />
+                  <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" style={{ animation: 'fadeIn 0.5s ease-out' }} />
                   <div className="relative bg-gradient-to-br from-yellow-200 via-orange-200 to-pink-200 rounded-2xl p-8 shadow-2xl border-4 border-yellow-300"
-                       style={{ animation: 'celebration 1s ease-out', transform: 'scale(1.05)', boxShadow: '0 20px 40px rgba(0,0,0,0.3), 0 0 20px rgba(255,215,0,0.5)' }}>
+                       style={{ animation: 'celebration 1s ease-out', transform: 'scale(1.05)' }}>
                     <div className="text-center">
-                      <div className="text-6xl mb-4 animate-bounce">🎉✨🏆✨🎉</div>
+                      <div className="text-6xl mb-4">🎉✨🏆✨🎉</div>
                       <div className="text-3xl font-bold text-gray-800 mb-3">퍼즐 완성!</div>
-                      <div className="text-xl text-gray-700 mb-2">축하합니다</div>
-                      <div className="bg-white/80 rounded-lg p-3 mb-4 backdrop-blur-sm">
+                      <div className="bg-white/80 rounded-lg p-3 mb-4">
                         <div className="text-lg font-semibold text-gray-800">⏱ 완료 시간: {elapsed.toFixed(1)}초</div>
                         <div className="text-sm text-gray-600">{Math.floor(elapsed / 60)}분 {Math.floor(elapsed % 60)}초</div>
                       </div>
                       <button onClick={() => { shuffle(); setElapsed(0) }}
-                              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-                              style={{ pointerEvents: 'auto' }}>
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold text-lg">
                         🎯 새 게임 시작하기
                       </button>
                     </div>
@@ -708,34 +663,9 @@ const playRect: Rect = useMemo(
         </div>
 
         <footer className="mt-4 text-center text-xs text-gray-500">
-          중앙 플레이 영역에 맞춰 조각을 스냅/결합 · 퍼즐 완성 시 자동 정렬 및 팝업 표시
+          메인 페이지에서 선택한 이미지가 퍼즐 조각으로 적용됩니다 · 조각은 회색 보드 내부에서만 이동합니다
         </footer>
       </div>
     </div>
   )
-}
-
-/** Suspense 경계 안에서만 useSearchParams 사용 */
-function ParamsLoader(props: {
-  onApply: (image: string | null, difficulty: number | null, rc?: { r: number; c: number } | null) => void
-}) {
-  const sp = useSearchParams()
-  const once = useRef(false)
-
-  useEffect(() => {
-    if (once.current) return
-    const img = sp.get('image')
-    const diff = sp.get('difficulty')
-    const r = sp.get('rows')
-    const c = sp.get('cols')
-
-    props.onApply(
-      img,
-      diff ? Number(diff) : null,
-      r && c ? { r: Number(r), c: Number(c) } : null,
-    )
-    once.current = true
-  }, [sp, props])
-
-  return null
 }
