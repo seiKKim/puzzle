@@ -2,8 +2,9 @@
 
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 
 // ---------------- Types ----------------
@@ -27,14 +28,6 @@ const range = (n: number) => Array.from({ length: n }, (_, i) => i)
 const isEdge = (r: number, c: number, rows: number, cols: number) => r === 0 || c === 0 || r === rows - 1 || c === cols - 1
 const norm = (a: number) => (a % 360 + 360) % 360
 
-type PointerCaptureTarget = Element & {
-  setPointerCapture(pointerId: number): void
-}
-function isPointerCaptureTarget(t: EventTarget | null): t is PointerCaptureTarget {
-  return !!t && typeof (t as Element).setPointerCapture === 'function'
-}
-
-// Seeded PRNG
 function mulberry32(seed: number) {
   return function () {
     let t = (seed += 0x6D2B79F5)
@@ -51,8 +44,6 @@ function hashString(s: string) {
   }
   return (h >>> 0) || 1
 }
-
-// Edge generation
 function buildEdges(rows: number, cols: number, rng: () => number): Edges[][] {
   const edges: Edges[][] = Array.from({ length: rows }, () =>
     Array.from({ length: cols }, () => ({ top: 0, right: 0, bottom: 0, left: 0 })),
@@ -68,8 +59,6 @@ function buildEdges(rows: number, cols: number, rng: () => number): Edges[][] {
   }
   return edges
 }
-
-// Piece path
 function buildPiecePath(w: number, h: number, e: Edges, knob = Math.min(w, h) * 0.22): string {
   const k = knob, cw = w / 2, ch = h / 2, c = k * 0.552
   const top = (s: number) => !s ? `L ${w} 0` : [
@@ -100,22 +89,23 @@ function buildPiecePath(w: number, h: number, e: Edges, knob = Math.min(w, h) * 
 }
 
 // ---------- Non-overlapping spawn positions ----------
-function rectsOverlap(a: Rect, b: Rect, gap: number) {
-  return !(
+type Spawn = { x: number; y: number }
+type RectOnly = { x: number; y: number; w: number; h: number }
+const rectsOverlap = (a: RectOnly, b: RectOnly, gap: number) =>
+  !(
     a.x + a.w + gap <= b.x ||
     b.x + b.w + gap <= a.x ||
     a.y + a.h + gap <= b.y ||
     b.y + b.h + gap <= a.y
   )
-}
+
 function shuffleInPlace<T>(arr: T[], rng: () => number) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1))
-    const tmp = arr[i]
-    arr[i] = arr[j]
-    arr[j] = tmp
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
 }
+
 function generateNonOverlappingSpawnPositions(
   outerW: number,
   outerH: number,
@@ -124,15 +114,15 @@ function generateNonOverlappingSpawnPositions(
   tileH: number,
   count: number,
   rng: () => number,
-) {
+): Spawn[] {
   const gapBase = Math.max(10, Math.round(Math.min(tileW, tileH) * 0.12))
-  const bands: Rect[] = [
-    { x: 0, y: 0, w: Math.max(0, play.x), h: outerH },                                       // left
-    { x: play.x + play.w, y: 0, w: Math.max(0, outerW - (play.x + play.w)), h: outerH },     // right
-    { x: 0, y: 0, w: outerW, h: Math.max(0, play.y) },                                       // top
-    { x: 0, y: play.y + play.h, w: outerW, h: Math.max(0, outerH - (play.y + play.h)) },     // bottom
+  const bands: RectOnly[] = [
+    { x: 0, y: 0, w: Math.max(0, play.x), h: outerH },
+    { x: play.x + play.w, y: 0, w: Math.max(0, outerW - (play.x + play.w)), h: outerH },
+    { x: 0, y: 0, w: outerW, h: Math.max(0, play.y) },
+    { x: 0, y: play.y + play.h, w: outerW, h: Math.max(0, outerH - (play.y + play.h)) },
   ]
-  const candidates: Rect[] = []
+  const candidates: RectOnly[] = []
   for (const b of bands) {
     if (b.w <= 0 || b.h <= 0) continue
     const stepX = tileW + gapBase, stepY = tileH + gapBase
@@ -143,8 +133,8 @@ function generateNonOverlappingSpawnPositions(
     }
   }
   shuffleInPlace(candidates, rng)
-  const out: Rect[] = []
-  const trySelect = (rects: Rect[], gap: number) => {
+  const out: RectOnly[] = []
+  const trySelect = (rects: RectOnly[], gap: number) => {
     for (const r of rects) {
       if (out.length >= count) break
       let ok = true
@@ -170,26 +160,20 @@ function generateNonOverlappingSpawnPositions(
 
 // ---------------- Component ----------------
 export default function PuzzlePage() {
-  const searchParams = useSearchParams()
-
-  // Query params → 초기 이미지/난이도
-  const qpImage = searchParams.get('image')
-  const qpDifficulty = Number(searchParams.get('difficulty') ?? '')
-
   // Core state
-  const [imageFile, setImageFile] = useState<File | null>(null)
   const [imageUrl, setImageUrl] = useState<string>('')
   const [cols, setCols] = useState(4)
   const [rows, setRows] = useState(4)
 
-  // Background (play area)
+  // Background (play area only)
   const [bgOpacity, setBgOpacity] = useState(0.35)
   const [bgBlur, setBgBlur] = useState(true)
 
-  // UX
-  const [snapTolerance, setSnapTolerance] = useState(50) // 기본 50px
+  const [snapTolerance, setSnapTolerance] = useState(25)
   const [boardScale, setBoardScale] = useState(1)
   const [showGuides, setShowGuides] = useState(true)
+
+  // UX toggles
   const [edgesOnly, setEdgesOnly] = useState(false)
   const [rotationMode, setRotationMode] = useState(false)
   const [captureMode, setCaptureMode] = useState(false)
@@ -201,78 +185,71 @@ export default function PuzzlePage() {
   // Layout
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [outerRect, setOuterRect] = useState({ w: 1100, h: 800 })
-
-  // 중앙 플레이 영역 (정사각형)
-  const playSize = Math.min(640, Math.max(400, Math.floor(Math.min(outerRect.w, outerRect.h) * 0.6)))
+  const playSize = useMemo(
+    () => Math.min(640, Math.max(400, Math.floor(Math.min(outerRect.w, outerRect.h) * 0.6))),
+    [outerRect.w, outerRect.h],
+  )
   const playW = playSize, playH = playSize
   const playX = Math.floor((outerRect.w - playW) / 2)
   const playY = Math.floor((outerRect.h - playH) / 2)
-  const playRect: Rect = { x: playX, y: playY, w: playW, h: playH }
-
-  // 이미지 원본 사이즈 (참고용)
-  const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 })
-  // 타일 크기
-  const tileW = Math.floor(playW / cols)
-  const tileH = Math.floor(playH / rows)
+const playRect: Rect = useMemo(
+  () => ({ x: playX, y: playY, w: playW, h: playH }),
+  [playX, playY, playW, playH]
+)
 
   // Tiles
+  const tileW = Math.floor(playW / cols)
+  const tileH = Math.floor(playH / rows)
   const [tiles, setTiles] = useState<Tile[]>([])
   const [dragging, setDragging] = useState<{ ids: number[]; anchor: { dx: number; dy: number }[] } | null>(null)
 
-  // Edges (seeded by image+grid)
   const edgesGrid = useMemo(() => {
     const seed = hashString(`${imageUrl}|${rows}x${cols}`)
     const rng = mulberry32(seed)
     return buildEdges(rows, cols, rng)
   }, [imageUrl, rows, cols])
 
-  // 슬롯(완성 위치)
-  const slots = useMemo(
-    () => range(rows).flatMap(r => range(cols).map(c => ({ id: r * cols + c, x: playX + c * tileW, y: playY + r * tileH }))),
-    [rows, cols, tileW, tileH, playX, playY],
+  // Non-overlap spawn + shuffle
+  const clampIntoBoard = useCallback((x: number, y: number) => ({
+    x: clamp(x, 0, outerRect.w - tileW),
+    y: clamp(y, 0, outerRect.h - tileH),
+  }), [outerRect.w, outerRect.h, tileW, tileH])
+
+  const shuffle = useCallback(() => {
+  if (!imageUrl) return
+  const total = rows * cols
+  const seed = hashString(
+    `spawn|${outerRect.w}x${outerRect.h}|${playRect.x},${playRect.y},${playRect.w}x${playRect.h}|${rows}x${cols}`
+  )
+  const rng = mulberry32(seed)
+  const spawns = generateNonOverlappingSpawnPositions(
+    outerRect.w, outerRect.h, playRect, tileW, tileH, total, rng
   )
 
-  // 파일 업로드
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file && file.type.startsWith('image/')) {
-      setImageFile(file)
-      const url = URL.createObjectURL(file)
-      setImageUrl(url)
-    }
-  }
-  useEffect(() => {
-    return () => {
-      if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl)
-    }
-  }, [imageUrl])
-
-  // 쿼리 파라미터 반영 (image, difficulty)
-  useEffect(() => {
-    if (qpImage) {
-      try {
-        const decoded = decodeURIComponent(qpImage)
-        setImageUrl(decoded)
-        setImageFile(null)
-      } catch {
-        setImageUrl(qpImage)
-        setImageFile(null)
+  const init = range(rows).flatMap(r =>
+    range(cols).map(c => {
+      const id = r * cols + c
+      const pos = spawns[id] || {
+        x: Math.random() * (outerRect.w - tileW),
+        y: Math.random() * (outerRect.h - tileH),
       }
-    } else if (!imageUrl) {
-      // 기본 프리셋
-      setImageUrl('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop')
-    }
-    if (!Number.isNaN(qpDifficulty) && qpDifficulty > 0) {
-      const n = Math.sqrt(qpDifficulty)
-      if (Number.isInteger(n)) {
-        setCols(n)
-        setRows(n)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qpImage, qpDifficulty])
+      const clamped = clampIntoBoard(pos.x, pos.y)
+      return { id, row: r, col: c, x: clamped.x, y: clamped.y, angle: 0, locked: false, groupId: id } as Tile
+    }),
+  )
+  setTiles(init)
+  setElapsed(0)
+  setPaused(false)
+}, [
+  imageUrl, rows, cols,
+  outerRect.w, outerRect.h,
+  playRect,            // ✅ 메모이즈된 객체만 사용
+  tileW, tileH,
+  clampIntoBoard
+])
 
-  // 외곽 보드 크기 추적
+
+  // Resize observer
   useEffect(() => {
     const update = () => {
       if (!boardRef.current) return
@@ -285,47 +262,21 @@ export default function PuzzlePage() {
     return () => ro.disconnect()
   }, [])
 
-  // 보드 클램프
-  const clampIntoBoard = (x: number, y: number) => ({
-    x: clamp(x, 0, outerRect.w - tileW),
-    y: clamp(y, 0, outerRect.h - tileH),
-  })
+  // Shuffle when grid/image changes
+  useEffect(() => { shuffle() }, [shuffle])
 
-  // 섞기(겹치지 않게)
-  const shuffle = () => {
-    if (!imageUrl) return
-    const total = rows * cols
-    const seed = hashString(`spawn|${outerRect.w}x${outerRect.h}|${playX},${playY},${playW}x${playH}|${rows}x${cols}`)
-    const rng = mulberry32(seed)
-    const spawns = generateNonOverlappingSpawnPositions(outerRect.w, outerRect.h, playRect, tileW, tileH, total, rng)
-
-    const init = range(rows).flatMap(r =>
-      range(cols).map(c => {
-        const id = r * cols + c
-        const pos = spawns[id] || { x: Math.random() * (outerRect.w - tileW), y: Math.random() * (outerRect.h - tileH) }
-        const clamped = clampIntoBoard(pos.x, pos.y)
-        const tile: Tile = { id, row: r, col: c, x: clamped.x, y: clamped.y, angle: 0, locked: false, groupId: id }
-        return tile
-      }),
-    )
-    setTiles(init)
-    setElapsed(0)
-    setPaused(false)
-  }
-
-  // 이미지/그리드 변경 → 섞기
+  // Default image
   useEffect(() => {
-    shuffle()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, cols, imageUrl])
+    if (!imageUrl) setImageUrl('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop')
+  }, [imageUrl])
 
-  // 완료 여부
+  // Solved
   const solved = useMemo(
     () => tiles.length > 0 && tiles.length === rows * cols && tiles.every(t => t.locked),
     [tiles, rows, cols],
   )
 
-  // 타이머
+  // Timer
   useEffect(() => {
     let raf: number
     let last = performance.now()
@@ -339,7 +290,7 @@ export default function PuzzlePage() {
     return () => cancelAnimationFrame(raf)
   }, [paused, solved])
 
-  // 단축키
+  // Keyboard
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'c') setCaptureMode(v => !v)
@@ -353,9 +304,9 @@ export default function PuzzlePage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [rotationMode])
+  }, [rotationMode, shuffle])
 
-  // Selection/Rotation
+  // Actions
   function toggleSelect(id: number) {
     setTiles(prev => {
       const me = prev.find(t => t.id === id)
@@ -369,14 +320,11 @@ export default function PuzzlePage() {
     setTiles(prev => prev.map(t => (t.selected && !t.locked ? { ...t, angle: (t.angle + delta + 360) % 360 } : t)))
   }
 
-  // 전체 조립 감지 → 중앙으로 스냅 & 잠금
+  // Finalize when full group assembled (anywhere)
   function finalizeIfAssembled(next: Tile[]) {
     const total = rows * cols
     const groups = new Map<number, Tile[]>()
-    for (const t of next) {
-      const arr = groups.get(t.groupId)
-      if (arr) arr.push(t); else groups.set(t.groupId, [t])
-    }
+    for (const t of next) { const arr = groups.get(t.groupId); if (arr) arr.push(t); else groups.set(t.groupId, [t]) }
     const tol = Math.max(25, Math.min(tileW, tileH) * 0.35)
 
     for (const [, group] of groups) {
@@ -403,7 +351,6 @@ export default function PuzzlePage() {
       )
       break
     }
-    // 안전하게 보드 안으로
     next = next.map(t => {
       const c = clampIntoBoard(t.x, t.y)
       return { ...t, x: c.x, y: c.y }
@@ -435,9 +382,8 @@ export default function PuzzlePage() {
       const anchors = group.map(g => ({ dx: px - g.x, dy: py - g.y }))
       setDragging({ ids: group.map(g => g.id), anchor: anchors })
 
-      const el = e.target
-      if (isPointerCaptureTarget(el)) el.setPointerCapture(e.pointerId)
-
+      // 표준 DOM API 사용(추가 타입 선언 불필요)
+      ;(e.target as Element | null)?.setPointerCapture?.(e.pointerId)
       return next
     })
   }
@@ -465,6 +411,8 @@ export default function PuzzlePage() {
     })
   }
 
+  const isComplement = (a: number, b: number) => a !== 0 && a === -b
+
   const onPointerUp = () => {
     if (!dragging) return
     const ids = dragging.ids
@@ -473,7 +421,7 @@ export default function PuzzlePage() {
     setTiles(prev => {
       let next = prev
 
-      // 1) 슬롯 스냅
+      // 1) Slot snap
       next = next.map(t => {
         if (!ids.includes(t.id) || t.locked) return t
         const slotX = playX + t.col * tileW
@@ -487,7 +435,7 @@ export default function PuzzlePage() {
         return { ...t, x: cl.x, y: cl.y, angle: 0, locked: true, selected: false }
       })
 
-      // 2) 그룹 병합(인터락)
+      // 2) Group merging (bidirectional complement check)
       const idSet = new Set(ids)
       const getByRC = (r: number, c: number) => next.find(tt => tt.row === r && tt.col === c)
       const tryMergePair = (a: Tile, b: Tile, dir: 'R' | 'L' | 'T' | 'B') => {
@@ -495,15 +443,18 @@ export default function PuzzlePage() {
         if ((a.angle % 360) !== (b.angle % 360)) return false
         const eA = edgesGrid[a.row][a.col], eB = edgesGrid[b.row][b.col]
         const ok =
-          (dir === 'R' && eA.right === 1 && eB.left === -1) ||
-          (dir === 'L' && eA.left === -1 && eB.right === 1) ||
-          (dir === 'T' && eA.top === -1 && eB.bottom === 1) ||
-          (dir === 'B' && eA.bottom === 1 && eB.top === -1)
+          (dir === 'R' && isComplement(eA.right,  eB.left))   ||
+          (dir === 'L' && isComplement(eA.left,   eB.right))  ||
+          (dir === 'T' && isComplement(eA.top,    eB.bottom)) ||
+          (dir === 'B' && isComplement(eA.bottom, eB.top))
         if (!ok) return false
+
         const expect =
-          dir === 'R' ? { dx: tileW, dy: 0 } :
+          dir === 'R' ? { dx: tileW,  dy: 0 } :
           dir === 'L' ? { dx: -tileW, dy: 0 } :
-          dir === 'T' ? { dx: 0, dy: -tileH } : { dx: 0, dy: tileH }
+          dir === 'T' ? { dx: 0,      dy: -tileH } :
+                        { dx: 0,      dy: tileH }
+
         const ddx = Math.abs(b.x - a.x - expect.dx)
         const ddy = Math.abs(b.y - a.y - expect.dy)
         const tol = Math.max(30, Math.min(tileW, tileH) * 0.35)
@@ -513,6 +464,7 @@ export default function PuzzlePage() {
         const offsetX = a.x + expect.dx - b.x
         const offsetY = a.y + expect.dy - b.y
         next = next.map(t => (t.groupId === from ? { ...t, groupId: to, x: t.x + offsetX, y: t.y + offsetY, angle: a.angle } : t))
+        // keep inside board
         next = next.map(t => (t.groupId === to ? { ...t, ...clampIntoBoard(t.x, t.y) } : t))
         return true
       }
@@ -536,9 +488,8 @@ export default function PuzzlePage() {
         for (const i of expanded) idSet.add(i)
       }
 
-      // 3) 전체 조립 감지
+      // 3) Final assembly detection
       next = finalizeIfAssembled(next)
-
       return next.sort((a, b) => Number(a.locked) - Number(b.locked))
     })
   }
@@ -553,7 +504,6 @@ export default function PuzzlePage() {
     if (rotationMode) setTiles(prev => prev.map(t => (t.id === id || (t.selected && !t.locked)) ? { ...t, angle: (t.angle + 90) % 360 } : t))
   }
 
-  // Presets (업로드 안했을 때만 노출)
   const presets = [
     { label: 'Vibrant Vibes', url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop' },
     { label: 'Mountains', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop' },
@@ -569,6 +519,18 @@ export default function PuzzlePage() {
 
   return (
     <div className="min-h-screen w-full bg-gray-50">
+      {/* 검색 파라미터 → 상태 반영 (Suspense 필요) */}
+      <Suspense fallback={null}>
+        <ParamsLoader onApply={(img, diff, rc) => {
+          if (img) setImageUrl(img)
+          if (typeof diff === 'number' && diff > 0) {
+            const g = Math.round(Math.sqrt(diff))
+            if (g * g === diff) { setRows(g); setCols(g) }
+          }
+          if (rc) { const { r, c } = rc; if (r > 0 && c > 0) { setRows(r); setCols(c) } }
+        }} />
+      </Suspense>
+
       <style jsx global>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes celebration { 0% { transform: scale(0.5) rotate(-5deg); opacity: 0; } 50% { transform: scale(1.1) rotate(2deg); opacity: 1; } 100% { transform: scale(1.05) rotate(0deg); opacity: 1; } }
@@ -584,22 +546,7 @@ export default function PuzzlePage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              이미지 업로드
-              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-              <div className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors">
-                {imageFile ? imageFile.name.slice(0, 20) + (imageFile.name.length > 20 ? '...' : '') : '파일 선택'}
-              </div>
-            </label>
-
-            <select
-              className="rounded-md border px-2 py-1 text-sm"
-              value={`${cols}x${rows}`}
-              onChange={(e) => {
-                const [c, r] = e.target.value.split('x').map(Number)
-                setCols(c); setRows(r)
-              }}
-            >
+            <select className="rounded-md border px-2 py-1 text-sm" value={`${cols}x${rows}`} onChange={(e) => { const [c, r] = e.target.value.split('x').map(Number); setCols(c); setRows(r) }}>
               <option value="2x2">2 × 2</option>
               <option value="3x3">3 × 3</option>
               <option value="4x4">4 × 4</option>
@@ -608,14 +555,7 @@ export default function PuzzlePage() {
 
             <label className="flex items-center gap-2 text-sm">
               Snap(px)
-              <input
-                type="number"
-                min={10}
-                max={100}
-                value={snapTolerance}
-                onChange={(e) => setSnapTolerance(Number(e.target.value))}
-                className="w-20 rounded-md border px-2 py-1 text-sm"
-              />
+              <input type="number" min={10} max={50} value={snapTolerance} onChange={(e) => setSnapTolerance(Number(e.target.value))} className="w-20 rounded-md border px-2 py-1 text-sm" />
             </label>
 
             <label className="flex items-center gap-2 text-sm">
@@ -643,21 +583,13 @@ export default function PuzzlePage() {
         </header>
 
         <div className="mb-3 flex flex-wrap gap-2">
-          {!imageFile && (
-            <>
-              {presets.map((p) => (
-                <button key={p.label} onClick={() => setImageUrl(p.url)} className={`rounded-md border px-2 py-1 text-sm ${imageUrl === p.url ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}`}>{p.label}</button>
-              ))}
-            </>
-          )}
-          {imageFile && (
-            <button
-              onClick={() => { setImageFile(null); setImageUrl('') }}
-              className="rounded-md border border-red-300 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
-            >
-              업로드한 이미지 제거
-            </button>
-          )}
+          {[
+            { label: 'Vibrant Vibes', url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop' },
+            { label: 'Mountains', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop' },
+            { label: 'City Night', url: 'https://images.unsplash.com/photo-1482192596544-9eb780fc7f66?q=80&w=1600&auto=format&fit=crop' },
+          ].map((p) => (
+            <button key={p.label} onClick={() => setImageUrl(p.url)} className={`rounded-md border px-2 py-1 text-sm ${imageUrl === p.url ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'}`}>{p.label}</button>
+          ))}
           <div className="text-xs text-gray-500">단축키: c(캡처), r(섞기), p(타이머), g(가이드), ←/→(회전)</div>
         </div>
 
@@ -670,31 +602,32 @@ export default function PuzzlePage() {
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
           >
-            {/* Play area background */}
+            {/* Play area background (next/image) */}
             {imageUrl && (
               <div
                 className="absolute rounded-xl overflow-hidden"
                 style={{ left: playX, top: playY, width: playW, height: playH, opacity: bgOpacity, filter: bgBlur ? 'blur(2px) brightness(0.9) saturate(0.95)' : 'none' }}
               >
-                <img
-                  src={imageUrl}
-                  alt="puzzle background"
-                  style={{ width: playW, height: playH, objectFit: 'cover', objectPosition: 'center' }}
-                  onLoad={(e) => {
-                    const img = e.currentTarget
-                    setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight })
-                  }}
-                />
+                <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                  <Image
+                    src={imageUrl}
+                    alt="puzzle background"
+                    fill
+                    unoptimized
+                    sizes={`${playW}px`}
+                    style={{ objectFit: 'cover' }}
+                    priority
+                  />
+                </div>
               </div>
             )}
 
-            {/* Placeholder */}
+            {/* Placeholder when no image */}
             {!imageUrl && (
               <div className="absolute rounded-xl border-2 border-dashed border-gray-400 bg-gray-100 flex items-center justify-center" style={{ left: playX, top: playY, width: playW, height: playH }}>
                 <div className="text-center text-gray-500">
                   <div className="text-4xl mb-2">📷</div>
-                  <div className="text-sm">이미지를 업로드하거나</div>
-                  <div className="text-sm">프리셋을 선택해주세요</div>
+                  <div className="text-sm">이미지를 선택하거나 프리셋을 눌러주세요</div>
                 </div>
               </div>
             )}
@@ -736,11 +669,7 @@ export default function PuzzlePage() {
                     viewBox={`${-pad} ${-pad} ${tileW + pad * 2} ${tileH + pad * 2}`}
                     style={{ pointerEvents: 'none', transform: `rotate(${t.angle}deg)`, transformOrigin: 'center' }}
                   >
-                    <defs>
-                      <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
-                        <path d={pathD} />
-                      </clipPath>
-                    </defs>
+                    <defs><clipPath id={clipId} clipPathUnits="userSpaceOnUse"><path d={pathD} /></clipPath></defs>
                     <g clipPath={`url(#${clipId})`}>
                       <image href={imageUrl} x={imgX} y={imgY} width={playW} height={playH} preserveAspectRatio="xMidYMid slice" />
                     </g>
@@ -755,10 +684,8 @@ export default function PuzzlePage() {
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-50">
                 <div className="relative">
                   <div className="fixed inset-0 bg-black/70 backdrop-blur-sm animate-pulse" style={{ animation: 'fadeIn 0.5s ease-out' }} />
-                  <div
-                    className="relative bg-gradient-to-br from-yellow-200 via-orange-200 to-pink-200 rounded-2xl p-8 shadow-2xl border-4 border-yellow-300"
-                    style={{ animation: 'celebration 1s ease-out', transform: 'scale(1.05)', boxShadow: '0 20px 40px rgba(0,0,0,0.3), 0 0 20px rgba(255,215,0,0.5)' }}
-                  >
+                  <div className="relative bg-gradient-to-br from-yellow-200 via-orange-200 to-pink-200 rounded-2xl p-8 shadow-2xl border-4 border-yellow-300"
+                       style={{ animation: 'celebration 1s ease-out', transform: 'scale(1.05)', boxShadow: '0 20px 40px rgba(0,0,0,0.3), 0 0 20px rgba(255,215,0,0.5)' }}>
                     <div className="text-center">
                       <div className="text-6xl mb-4 animate-bounce">🎉✨🏆✨🎉</div>
                       <div className="text-3xl font-bold text-gray-800 mb-3">퍼즐 완성!</div>
@@ -767,18 +694,12 @@ export default function PuzzlePage() {
                         <div className="text-lg font-semibold text-gray-800">⏱ 완료 시간: {elapsed.toFixed(1)}초</div>
                         <div className="text-sm text-gray-600">{Math.floor(elapsed / 60)}분 {Math.floor(elapsed % 60)}초</div>
                       </div>
-                      <button
-                        onClick={() => { shuffle(); setElapsed(0) }}
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-                        style={{ pointerEvents: 'auto' }}
-                      >
+                      <button onClick={() => { shuffle(); setElapsed(0) }}
+                              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                              style={{ pointerEvents: 'auto' }}>
                         🎯 새 게임 시작하기
                       </button>
                     </div>
-                    <div className="absolute -top-2 -right-2 text-yellow-400 text-2xl animate-spin" style={{ animationDuration: '3s' }}>⭐</div>
-                    <div className="absolute -top-1 -left-3 text-yellow-300 text-xl animate-bounce" style={{ animationDelay: '0.5s' }}>✨</div>
-                    <div className="absolute -bottom-2 -right-3 text-pink-400 text-xl animate-pulse" style={{ animationDelay: '1s' }}>💫</div>
-                    <div className="absolute -bottom-1 -left-2 text-orange-400 text-lg animate-bounce" style={{ animationDelay: '1.5s' }}>🌟</div>
                   </div>
                 </div>
               </div>
@@ -787,9 +708,34 @@ export default function PuzzlePage() {
         </div>
 
         <footer className="mt-4 text-center text-xs text-gray-500">
-          메인페이지에서 고른 이미지와 난이도(조각 수)를 그대로 가져와 플레이합니다. 모든 조각은 회색 보드 내부에서만 이동합니다.
+          중앙 플레이 영역에 맞춰 조각을 스냅/결합 · 퍼즐 완성 시 자동 정렬 및 팝업 표시
         </footer>
       </div>
     </div>
   )
+}
+
+/** Suspense 경계 안에서만 useSearchParams 사용 */
+function ParamsLoader(props: {
+  onApply: (image: string | null, difficulty: number | null, rc?: { r: number; c: number } | null) => void
+}) {
+  const sp = useSearchParams()
+  const once = useRef(false)
+
+  useEffect(() => {
+    if (once.current) return
+    const img = sp.get('image')
+    const diff = sp.get('difficulty')
+    const r = sp.get('rows')
+    const c = sp.get('cols')
+
+    props.onApply(
+      img,
+      diff ? Number(diff) : null,
+      r && c ? { r: Number(r), c: Number(c) } : null,
+    )
+    once.current = true
+  }, [sp, props])
+
+  return null
 }
