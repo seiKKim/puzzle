@@ -1,3 +1,6 @@
+// 홈페이지 컴포넌트
+// src/app/page.tsx
+
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -208,10 +211,13 @@ export default function HomePage() {
                 <div
                   key={`rec-${puzzle.id}-${recommendationSeed}`}
                   className="group relative overflow-hidden rounded-xl bg-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
-                  style={{ 
-                    animationDelay: `${index * 100}ms`,
-                    animation: 'fadeInScale 0.6s ease-out forwards'
-                  }}
+   style={{
+     animationName: 'fadeInScale',
+     animationDuration: '0.6s',
+     animationTimingFunction: 'ease-out',
+    animationFillMode: 'forwards',
+     animationDelay: `${index * 100}ms`,
+   }}
                 >
                   <div className="aspect-square overflow-hidden relative">
                     <img
@@ -391,10 +397,13 @@ export default function HomePage() {
                 <div
                   key={`${puzzle.id}`}
                   className="group relative overflow-hidden rounded-xl bg-white shadow-md hover:shadow-lg transition-all duration-200"
-                  style={{ 
-                    animationDelay: `${index * 50}ms`,
-                    animation: 'fadeInUp 0.5s ease-out forwards'
-                  }}
+   style={{
+     animationName: 'fadeInUp',
+     animationDuration: '0.5s',
+     animationTimingFunction: 'ease-out',
+     animationFillMode: 'forwards',
+     animationDelay: `${index * 50}ms`,
+   }}
                 >
                   <div className="aspect-square overflow-hidden">
                     <img
