@@ -1,4 +1,4 @@
-// 홈페이지 컴포넌트
+// 홈페이지 컴포넌트 - CSS 모듈 적용
 // src/app/page.tsx
 
 'use client'
@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 
 import Link from 'next/link'
+import styles from '../app/homepage.module.css'
 
 /** ---------------- Types ---------------- */
 interface PuzzleImage {
@@ -134,21 +135,21 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="mx-auto max-w-7xl px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
+      <header className={styles.header}>
+        <div className={styles.headerContainer}>
+          <div className={styles.headerContent}>
+            <div className={styles.headerLogo}>
+              <div className={styles.headerLogoIcon}>
                 <div className="text-2xl">🧩</div>
-                <h1 className="text-2xl font-bold text-gray-900">Puzzle Master</h1>
+                <h1 className={styles.headerLogoText}>Puzzle Master</h1>
               </div>
-              <div className="hidden md:block text-sm text-gray-600">온라인 직소퍼즐 게임</div>
+              <div className={styles.headerSubtitle}>온라인 직소퍼즐 게임</div>
             </div>
-            <nav className="flex items-center gap-4">
-              <Link href="/puzzle" className="text-sm text-gray-600 hover:text-gray-900">
+            <nav className={styles.headerNav}>
+              <Link href="/puzzle" className={styles.headerNavLink}>
                 퍼즐 플레이
               </Link>
-              <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              <button className={styles.headerUploadButton}>
                 이미지 업로드
               </button>
             </nav>
@@ -157,15 +158,15 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 text-white">
-        <div className="mx-auto max-w-7xl px-4 py-16">
-          <div className="text-center">
-            <h2 className="text-4xl md:text-6xl font-bold mb-6">
+      <section className={styles.hero}>
+        <div className={styles.heroContainer}>
+          <div className={styles.heroContent}>
+            <h2 className={styles.heroTitle}>
               직소퍼즐의 즐거움을
               <br />
               온라인에서 경험하세요
             </h2>
-            <p className="text-xl md:text-2xl text-blue-100 mb-8 max-w-3xl mx-auto">
+            <p className={styles.heroDescription}>
               다양한 아름다운 이미지로 퍼즐을 만들고, 4단계 난이도로 도전해보세요.
               컬러와 흑백 퍼즐 중에서 선택할 수 있습니다!
             </p>
@@ -174,22 +175,22 @@ export default function HomePage() {
       </section>
 
       {/* Recommended Puzzles Section */}
-      <section className="py-12 bg-gradient-to-r from-purple-50 to-pink-50 border-b">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
+      <section className={styles.recommendedSection}>
+        <div className={styles.recommendedContainer}>
+          <div className={styles.recommendedHeader}>
+            <div className={styles.recommendedHeaderLeft}>
+              <div className={styles.recommendedHeaderTitle}>
                 <div className="text-2xl">✨</div>
-                <h3 className="text-2xl font-bold text-gray-900">오늘의 추천 퍼즐</h3>
+                <h3 className={styles.recommendedHeaderTitleText}>오늘의 추천 퍼즐</h3>
               </div>
-              <div className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full font-medium">
+              <div className={styles.recommendedBadge}>
                 매일 새로운 추천
               </div>
             </div>
             <button
               onClick={refreshRecommendations}
               disabled={loading || recommendedPuzzles.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+              className={styles.recommendedRefreshButton}
               title="새로운 추천 퍼즐 보기"
             >
               🔄 새로운 추천
@@ -198,32 +199,28 @@ export default function HomePage() {
 
           {/* 추천 퍼즐 로딩 */}
           {loading && (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
-              <span className="ml-3 text-gray-600">추천 퍼즐을 준비중...</span>
+            <div className={styles.loadingState}>
+              <div className={styles.loadingSpinner} />
+              <span className={styles.loadingText}>추천 퍼즐을 준비중...</span>
             </div>
           )}
 
           {/* 추천 퍼즐 그리드 */}
           {!loading && recommendedPuzzles.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className={styles.recommendedGrid}>
               {recommendedPuzzles.map((puzzle, index) => (
                 <div
                   key={`rec-${puzzle.id}-${recommendationSeed}`}
-                  className="group relative overflow-hidden rounded-xl bg-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
-   style={{
-     animationName: 'fadeInScale',
-     animationDuration: '0.6s',
-     animationTimingFunction: 'ease-out',
-    animationFillMode: 'forwards',
-     animationDelay: `${index * 100}ms`,
-   }}
+                  className={styles.recommendedCard}
+                  style={{
+                    animationDelay: `${index * 100}ms`,
+                  }}
                 >
-                  <div className="aspect-square overflow-hidden relative">
+                  <div className={styles.recommendedImageContainer}>
                     <img
                       src={puzzle.url}
                       alt={`추천 퍼즐 #${puzzle.id}`}
-                      className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      className={styles.recommendedImage}
                       loading="lazy"
                       onError={(e) => {
                         const target = e.currentTarget
@@ -232,36 +229,32 @@ export default function HomePage() {
                       }}
                     />
                     {/* 추천 배지 */}
-                    <div className="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
+                    <div className={styles.recommendedBadgeContainer}>
                       ⭐ 추천
                     </div>
                     {/* 순위 배지 */}
-                    <div className="absolute top-2 right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full font-bold">
+                    <div className={styles.rankBadge}>
                       #{index + 1}
                     </div>
                     {/* 호버 오버레이 */}
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
-                      <div className="opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                        <Link
-                          href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=16`}
-                          className="bg-white text-gray-900 px-4 py-2 rounded-lg font-medium text-sm hover:bg-gray-100 transition-colors"
-                        >
-                          🧩 플레이
-                        </Link>
-                      </div>
+                    <div className={styles.hoverOverlay}>
+                      <Link
+                        href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=16`}
+                        className={styles.hoverButton}
+                      >
+                        🧩 플레이
+                      </Link>
                     </div>
                   </div>
-                  <div className="p-3">
-                    <h4 className="font-medium text-gray-900 text-sm mb-2">퍼즐 #{puzzle.id}</h4>
-                    <div className="flex flex-wrap gap-1">
+                  <div className={styles.recommendedCardContent}>
+                    <h4 className={styles.recommendedCardTitle}>퍼즐 #{puzzle.id}</h4>
+                    <div className={styles.recommendedDifficultyTags}>
                       {puzzle.difficulty.slice(0, 2).map((pieces, diffIndex) => (
                         <Link
                           key={pieces}
                           href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=${pieces}`}
-                          className={`px-2 py-1 rounded text-xs transition-colors hover:scale-105 ${
-                            diffIndex === 0
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          className={`${styles.difficultyTag} ${
+                            diffIndex === 0 ? styles.difficultyTagGreen : styles.difficultyTagBlue
                           }`}
                         >
                           {pieces}조각
@@ -275,51 +268,51 @@ export default function HomePage() {
           )}
 
           {!loading && recommendedPuzzles.length === 0 && (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-2">🎭</div>
-              <p className="text-gray-600">추천할 퍼즐을 준비중입니다...</p>
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}>🎭</div>
+              <p className={styles.emptyMessage}>추천할 퍼즐을 준비중입니다...</p>
             </div>
           )}
         </div>
       </section>
 
       {/* Filters */}
-      <section className="py-8 bg-white border-t">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="flex flex-col gap-6">
+      <section className={styles.filtersSection}>
+        <div className={styles.filtersContainer}>
+          <div className={styles.filtersContent}>
             {/* Color/Gray Toggle */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">퍼즐 타입</h4>
-              <div className="flex gap-3">
+            <div className={styles.filterGroup}>
+              <h4 className={styles.filterGroupTitle}>퍼즐 타입</h4>
+              <div className={styles.filterButtons}>
                 <button
                   onClick={() => handleCategoryChange('color')}
                   aria-pressed={categoryType === 'color'}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
-                    categoryType === 'color'
-                      ? 'bg-gradient-to-r from-pink-500 to-orange-500 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  className={`${styles.categoryButton} ${
+                    categoryType === 'color' 
+                      ? `${styles.categoryButtonActive} ${styles.categoryButtonColor}` 
+                      : styles.categoryButtonInactive
                   }`}
                 >
-                  <div className="flex gap-1">
-                    <div className="w-3 h-3 rounded-full bg-red-400" />
-                    <div className="w-3 h-3 rounded-full bg-blue-400" />
-                    <div className="w-3 h-3 rounded-full bg-green-400" />
+                  <div className={styles.categoryColorDots}>
+                    <div className={`${styles.colorDot} ${styles.colorDotRed}`} />
+                    <div className={`${styles.colorDot} ${styles.colorDotBlue}`} />
+                    <div className={`${styles.colorDot} ${styles.colorDotGreen}`} />
                   </div>
                   컬러 퍼즐
                 </button>
                 <button
                   onClick={() => handleCategoryChange('gray')}
                   aria-pressed={categoryType === 'gray'}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
-                    categoryType === 'gray'
-                      ? 'bg-gradient-to-r from-gray-600 to-gray-800 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  className={`${styles.categoryButton} ${
+                    categoryType === 'gray' 
+                      ? `${styles.categoryButtonActive} ${styles.categoryButtonGray}` 
+                      : styles.categoryButtonInactive
                   }`}
                 >
-                  <div className="flex gap-1">
-                    <div className="w-3 h-3 rounded-full bg-gray-300" />
-                    <div className="w-3 h-3 rounded-full bg-gray-500" />
-                    <div className="w-3 h-3 rounded-full bg-gray-700" />
+                  <div className={styles.categoryColorDots}>
+                    <div className={`${styles.colorDot} ${styles.colorDotGray300}`} />
+                    <div className={`${styles.colorDot} ${styles.colorDotGray500}`} />
+                    <div className={`${styles.colorDot} ${styles.colorDotGray700}`} />
                   </div>
                   흑백 퍼즐
                 </button>
@@ -327,15 +320,15 @@ export default function HomePage() {
             </div>
 
             {/* Difficulty */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">난이도 선택</h4>
-              <div className="flex flex-wrap gap-2">
+            <div className={styles.filterGroup}>
+              <h4 className={styles.filterGroupTitle}>난이도 선택</h4>
+              <div className={styles.difficultyButtons}>
                 {DIFFICULTIES.map((diff) => (
                   <button
                     key={diff.pieces}
                     onClick={() => setSelectedDifficulty(diff.pieces)}
                     aria-pressed={selectedDifficulty === diff.pieces}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    className={`${styles.difficultyButton} ${
                       selectedDifficulty === diff.pieces
                         ? categoryType === 'color'
                           ? 'bg-orange-500 text-white'
@@ -354,14 +347,14 @@ export default function HomePage() {
       </section>
 
       {/* Puzzle Gallery */}
-      <section className="py-16">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-2xl font-bold text-gray-900">
+      <section className={styles.gallerySection}>
+        <div className={styles.galleryContainer}>
+          <div className={styles.galleryHeader}>
+            <h3 className={styles.galleryTitle}>
               {categoryType === 'color' ? '🎨' : '⚫'} {categoryType === 'color' ? '컬러' : '흑백'} 퍼즐 갤러리
               {!loading && ` (${puzzleImages.length}개)`}
             </h3>
-            <div className="text-sm text-gray-600">
+            <div className={styles.galleryFilter}>
               {selectedDifficulty !== 0 &&
                 `${DIFFICULTIES.find((d) => d.pieces === selectedDifficulty)?.label} 선택됨`}
             </div>
@@ -369,21 +362,21 @@ export default function HomePage() {
 
           {/* 로딩 */}
           {loading && (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-              <span className="ml-3 text-gray-600">퍼즐 로딩 중...</span>
+            <div className={styles.loadingState}>
+              <div className={styles.loadingSpinner} />
+              <span className={styles.loadingText}>퍼즐 로딩 중...</span>
             </div>
           )}
 
           {/* 오류 */}
           {error && (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">⚠️</div>
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">오류가 발생했습니다</h4>
-              <p className="text-gray-600 mb-4">{error}</p>
+            <div className={styles.errorState}>
+              <div className={styles.errorIcon}>⚠️</div>
+              <h4 className={styles.errorTitle}>오류가 발생했습니다</h4>
+              <p className={styles.errorMessage}>{error}</p>
               <button
                 onClick={() => fetchPuzzles()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className={styles.errorButton}
               >
                 다시 시도
               </button>
@@ -392,24 +385,20 @@ export default function HomePage() {
 
           {/* 그리드 */}
           {!loading && !error && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className={styles.galleryGrid}>
               {puzzleImages.map((puzzle, index) => (
                 <div
                   key={`${puzzle.id}`}
-                  className="group relative overflow-hidden rounded-xl bg-white shadow-md hover:shadow-lg transition-all duration-200"
-   style={{
-     animationName: 'fadeInUp',
-     animationDuration: '0.5s',
-     animationTimingFunction: 'ease-out',
-     animationFillMode: 'forwards',
-     animationDelay: `${index * 50}ms`,
-   }}
+                  className={styles.galleryCard}
+                  style={{
+                    animationDelay: `${index * 50}ms`,
+                  }}
                 >
-                  <div className="aspect-square overflow-hidden">
+                  <div className={styles.galleryImageContainer}>
                     <img
                       src={puzzle.url}
                       alt={`퍼즐 #${puzzle.id} 썸네일`}
-                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className={styles.galleryImage}
                       loading="lazy"
                       onError={(e) => {
                         const target = e.currentTarget
@@ -418,21 +407,21 @@ export default function HomePage() {
                       }}
                     />
                   </div>
-                  <div className="p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">퍼즐 #{puzzle.id}</h4>
-                    <div className="flex flex-wrap gap-1 mb-3">
+                  <div className={styles.galleryCardContent}>
+                    <h4 className={styles.galleryCardTitle}>퍼즐 #{puzzle.id}</h4>
+                    <div className={styles.galleryDifficultyTags}>
                       {puzzle.difficulty.map((pieces, diffIndex) => (
                         <Link
                           key={pieces}
                           href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=${pieces}`}
-                          className={`px-2 py-1 rounded text-xs transition-colors hover:scale-105 ${
+                          className={`${styles.galleryDifficultyTag} ${
                             diffIndex === 0
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              ? styles.galleryDifficultyTagGreen
                               : diffIndex === 1
-                              ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                              ? styles.galleryDifficultyTagBlue
                               : diffIndex === 2
-                              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                              ? styles.galleryDifficultyTagOrange
+                              : styles.galleryDifficultyTagRed
                           }`}
                         >
                           {pieces}조각
@@ -441,10 +430,10 @@ export default function HomePage() {
                     </div>
                     <Link
                       href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=16`}
-                      className={`block w-full text-center rounded-lg px-3 py-2 text-sm font-medium text-white transition-colors ${
+                      className={`${styles.galleryPlayButton} ${
                         categoryType === 'color'
-                          ? 'bg-orange-500 hover:bg-orange-600'
-                          : 'bg-gray-700 hover:bg-gray-800'
+                          ? styles.galleryPlayButtonColor
+                          : styles.galleryPlayButtonGray
                       }`}
                     >
                       🧩 퍼즐 시작하기
@@ -457,77 +446,84 @@ export default function HomePage() {
 
           {/* 검색 결과 없음 */}
           {!loading && !error && puzzleImages.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔍</div>
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">해당 조건의 퍼즐이 없습니다</h4>
-              <p className="text-gray-600 mb-4">다른 난이도를 선택하거나 퍼즐 타입을 변경해보세요.</p>
+            <div className={styles.emptyState}>
+              <div className={styles.emptyIcon}>🔍</div>
+              <h4 className={styles.emptyTitle}>해당 조건의 퍼즐이 없습니다</h4>
+              <p className={styles.emptyMessage}>다른 난이도를 선택하거나 퍼즐 타입을 변경해보세요.</p>
             </div>
           )}
         </div>
       </section>
 
       {/* Stats Section */}
-      <section className="py-16 bg-gray-900 text-white">
-        <div className="mx-auto max-w-7xl px-4">
-          <h3 className="text-2xl font-bold text-center mb-8">📊 퍼즐 통계</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-400 mb-2">10</div>
-              <div className="text-gray-300">컬러 퍼즐</div>
+      <section className={styles.statsSection}>
+        <div className={styles.statsContainer}>
+          <h3 className={styles.statsTitle}>📊 퍼즐 통계</h3>
+          <div className={styles.statsGrid}>
+            <div className={styles.statItem}>
+              <div className={`${styles.statNumber} ${styles.statNumberOrange}`}>10</div>
+              <div className={styles.statLabel}>컬러 퍼즐</div>
             </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-gray-400 mb-2">8</div>
-              <div className="text-gray-300">흑백 퍼즐</div>
+            <div className={styles.statItem}>
+              <div className={`${styles.statNumber} ${styles.statNumberGray}`}>8</div>
+              <div className={styles.statLabel}>흑백 퍼즐</div>
             </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-purple-400 mb-2">4</div>
-              <div className="text-gray-300">난이도 단계</div>
+            <div className={styles.statItem}>
+              <div className={`${styles.statNumber} ${styles.statNumberPurple}`}>4</div>
+              <div className={styles.statLabel}>난이도 단계</div>
             </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">6</div>
-              <div className="text-gray-300">매일 추천</div>
+            <div className={styles.statItem}>
+              <div className={`${styles.statNumber} ${styles.statNumberYellow}`}>6</div>
+              <div className={styles.statLabel}>매일 추천</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-white border-t py-12">
-        <div className="mx-auto max-w-7xl px-4">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="text-2xl">🧩</div>
-              <span className="text-xl font-bold text-gray-900">Puzzle Master</span>
-            </div>
-            <p className="text-gray-600 mb-4">컬러와 흑백, 4단계 난이도로 즐기는 온라인 직소퍼즐</p>
-            <div className="text-sm text-gray-500">© 2024 Puzzle Master. 모든 권리 보유.</div>
-          </div>
+<footer className={styles.siteFooter}>
+  <div className={styles.siteFooterContainer}>
+    <div className={styles.siteFooterRow}>
+      {/* 좌측: 회사 정보 */}
+      <div className={styles.siteFooterLeft}>
+        <div className={styles.brandLine}>
+          <span className={styles.brandPrimary}>Great Senior</span>
+          <span className={styles.brandSecondary}>network</span>
+          <span className={styles.legalLinks}>제휴문의 | 이메일 무단 수집 거부</span>
         </div>
-      </footer>
 
-      <style jsx global>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes fadeInScale {
-          from {
-            opacity: 0;
-            transform: translateY(20px) scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-      `}</style>
+        <div className={styles.addressBlock}>
+          <p className={styles.addressLine}>
+            <span className={styles.strong}>마인드라</span> 대표자 서현숙
+            <span className={`${styles.strong} ${styles.labelGap}`}>사업자등록번호:</span> 255-37-01508
+          </p>
+          <p>경기도 고양시 일산동구 중앙로 1036 4층(고양중장년기술창업센터, 1-1층)</p>
+          <p><span className={styles.strong}>통신판매신고번호:</span> 제2025-고양일산동-0921호</p>
+          <p className={styles.notice}>Copyright 2025. MINDRA INC. All rights reserved.</p>
+        </div>
+      </div>
+
+      {/* 우측: 패밀리 사이트 */}
+      <div className={styles.siteFooterRight}>
+        <p className={styles.familyLabel}>FAMILY SITE</p>
+        <div className={styles.familyRow}>
+          <span className={styles.familyBrand}>
+            Mind<span className={styles.familyBrandAccent}>ra</span>
+          </span>
+          <button
+            type="button"
+            aria-label="패밀리 사이트 메뉴 열기"
+            className={styles.familyButton}
+          >
+            <svg className={styles.caretIcon} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
     </div>
   )
 }

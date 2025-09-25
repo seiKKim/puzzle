@@ -1,10 +1,11 @@
 // app/puzzle/page.tsx
-// 홈페이지에서 선택한 이미지가 제대로 전달되도록 수정 + 효과음(SFX) 추가
+// CSS 모듈을 사용하도록 업데이트된 퍼즐 게임
 
 'use client'
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 
+import styles from '../../app/puzzle.module.css'
 import { useSearchParams } from 'next/navigation'
 
 // ---------------- Types ----------------
@@ -240,7 +241,6 @@ const ensureCtx = () => {
   return ctxRef.current
 }
 
-
   useEffect(() => {
     if (gainRef.current) gainRef.current.gain.value = volume
   }, [volume])
@@ -266,19 +266,117 @@ const ensureCtx = () => {
     osc.start(t)
     osc.stop(t + dur)
   }
-  const woodTick = () => pluck(900, 0.07, 'triangle') // 클릭
-  const softBell = () => { pluck(660, 0.12, 'sine'); pluck(990, 0.12, 'sine', -5) } // 스냅
-  const woodMerge = () => { pluck(520, 0.12, 'triangle'); pluck(780, 0.12, 'triangle', -8) } // 병합
+  const woodTick = () => pluck(900, 0.07, 'triangle')
+  const softBell = () => { pluck(660, 0.12, 'sine'); pluck(990, 0.12, 'sine', -5) }
+  const woodMerge = () => { pluck(520, 0.12, 'triangle'); pluck(780, 0.12, 'triangle', -8) }
   const rotateFx = () => pluck(420, 0.09, 'square')
   const shuffleFx = () => { pluck(260, 0.08, 'square'); pluck(330, 0.08, 'square'); pluck(390, 0.08, 'square') }
   const errorFx = () => pluck(180, 0.18, 'sawtooth')
-  const fanfare = () => { // 완성 팬페어 (짧은 아르페지오)
-    if (!enabled) return
-    const seq = [523, 659, 784, 1046] // C5-E5-G5-C6
-    seq.forEach((f, i) => setTimeout(() => pluck(f, 0.16, 'sine'), i * 90))
-  }
+const fanfare = () => {
+  if (!enabled) return
+  
+  const grandStart = [131, 165, 196, 262, 330, 392, 523, 659, 784, 1047]
+  grandStart.forEach((freq, i) => {
+    setTimeout(() => {
+      pluck(freq, 0.4, 'sawtooth', 0)
+      pluck(freq * 1.5, 0.35, 'triangle', -5)
+      pluck(freq / 2, 0.45, 'sine', 8)
+    }, i * 20)
+  })
+  
+  setTimeout(() => {
+    const chord1 = [262, 330, 392, 523, 659, 784, 1047, 1319]
+    chord1.forEach((freq, i) => {
+      setTimeout(() => {
+        pluck(freq, 0.5, 'sawtooth', 0)
+        pluck(freq * 1.01, 0.45, 'triangle', -8)
+        pluck(freq * 2, 0.2, 'sine', -15)
+      }, i * 15)
+    })
+    
+    for (let i = 0; i < 20; i++) {
+      setTimeout(() => {
+        pluck(2000 + Math.random() * 3000, 0.12, 'sawtooth')
+      }, Math.random() * 150)
+    }
+  }, 200)
+  
+  setTimeout(() => {
+    const chord2 = [196, 247, 294, 392, 494, 587, 784, 988, 1175]
+    chord2.forEach((freq, i) => {
+      setTimeout(() => {
+        pluck(freq, 0.55, 'sawtooth', 0)
+        pluck(freq * 1.005, 0.5, 'triangle', -3)
+        pluck(freq / 2, 0.6, 'sine', 10)
+        pluck(freq * 3, 0.15, 'sine', -20)
+      }, i * 18)
+    })
+    
+    for (let i = 0; i < 35; i++) {
+      setTimeout(() => {
+        pluck(1500 + Math.random() * 4000, 0.1, 'sine')
+      }, Math.random() * 200)
+    }
+  }, 500)
+  
+  setTimeout(() => {
+    const massiveChord = [
+      65, 82, 98, 131, 165, 196, 220, 247, 262, 294, 330, 370, 392, 440, 
+      494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175, 1319, 1480, 1568
+    ]
+    
+    massiveChord.forEach((freq, i) => {
+      setTimeout(() => {
+        pluck(freq, 0.6, 'sawtooth', 0)
+        pluck(freq * 1.01, 0.55, 'triangle', -5)
+        if (i % 3 === 0) pluck(freq * 2, 0.3, 'sine', -12)
+        if (i % 5 === 0) pluck(freq / 2, 0.65, 'sine', 15)
+      }, i * 12)
+    })
+    
+    for (let i = 0; i < 50; i++) {
+      setTimeout(() => {
+        pluck(1000 + Math.random() * 5000, 0.08 + Math.random() * 0.05, 'sine')
+      }, Math.random() * 300)
+    }
+  }, 900)
+  
+  setTimeout(() => {
+    const ultimateChord = [
+      44, 55, 66, 88, 110, 131, 147, 165, 196, 220, 247, 262, 294, 330, 
+      370, 392, 440, 494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175, 
+      1319, 1480, 1568, 1760, 1976, 2093, 2349, 2637
+    ]
+    
+    ultimateChord.forEach((freq, i) => {
+      setTimeout(() => {
+        pluck(freq, 0.8, 'sawtooth', 0)
+        pluck(freq * 1.008, 0.75, 'triangle', -3)
+        pluck(freq * 1.012, 0.7, 'sine', -6)
+        if (i % 2 === 0) pluck(freq * 2, 0.4, 'sine', -10)
+        if (i % 4 === 0) pluck(freq / 2, 0.85, 'sine', 12)
+      }, i * 8)
+    })
+    
+    for (let i = 0; i < 80; i++) {
+      setTimeout(() => {
+        const sparkle = 800 + Math.random() * 6000
+        pluck(sparkle, 0.06 + Math.random() * 0.08, 'sine')
+      }, Math.random() * 500)
+    }
+    
+    setTimeout(() => {
+      [2093, 2349, 2637, 3136, 3520].forEach((freq, i) => {
+        setTimeout(() => {
+          pluck(freq, 1.0, 'sine', 0)
+          pluck(freq * 1.01, 0.9, 'triangle', -8)
+        }, i * 100)
+      })
+    }, 200)
+  }, 1400)
+}
 
-  const prime = () => { // 첫 사용자 제스처 시 호출
+  const prime = () => {
     const ctx = ensureCtx()
     if (ctx && ctx.state === 'suspended') ctx.resume()
   }
@@ -299,22 +397,14 @@ const ensureCtx = () => {
 // ---------------- Main Component ----------------
 function PuzzleGameContent() {
   const searchParams = useSearchParams()
+  const sfx = useSfx()
 
-  // --- SFX
-const sfx = useSfx()
-
-useEffect(() => {
-  const handler = () => sfx.prime()
-
-  // 옵션을 타입 안전하게 선언
-  const opts: AddEventListenerOptions = { once: true, capture: true }
-
-  window.addEventListener('pointerdown', handler, opts)
-
-  // remove 시에는 capture 값만 일치하면 되므로 boolean 사용 (any 불필요)
-  return () => window.removeEventListener('pointerdown', handler, true)
-}, [])
- // 최초 1회
+  useEffect(() => {
+    const handler = () => sfx.prime()
+    const opts: AddEventListenerOptions = { once: true, capture: true }
+    window.addEventListener('pointerdown', handler, opts)
+    return () => window.removeEventListener('pointerdown', handler, true)
+  }, [])
 
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imageUrl, setImageUrl] = useState<string>('')
@@ -415,6 +505,7 @@ useEffect(() => {
           case 9: setCols(3); setRows(3); break
           case 16: setCols(4); setRows(4); break
           case 36: setCols(6); setRows(6); break
+          case 49: setCols(7); setRows(7); break
           default: break
         }
       }
@@ -585,7 +676,7 @@ useEffect(() => {
     }
     const tol = Math.max(25, Math.min(tileW, tileH) * 0.35)
 
-    for (const [, group] of groups) {
+    for (const group of Array.from(groups.values())) {
       if (group.length !== total) continue
       const a0 = norm(group[0].angle)
       if (!group.every((t) => norm(t.angle) === a0)) continue
@@ -826,15 +917,6 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen w-full bg-gray-50">
-      <style jsx global>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes celebration {
-          0% { transform: scale(0.5) rotate(-5deg); opacity: 0; }
-          50% { transform: scale(1.1) rotate(2deg); opacity: 1; }
-          100% { transform: scale(1.05) rotate(0deg); opacity: 1; }
-        }
-      `}</style>
-
       <div className="mx-auto max-w-[1400px] px-4 py-6">
         <header className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex flex-wrap items-center gap-3">
@@ -893,6 +975,7 @@ useEffect(() => {
               <option value="3x3">3 × 3 (9조각)</option>
               <option value="4x4">4 × 4 (16조각)</option>
               <option value="6x6">6 × 6 (36조각)</option>
+              <option value="7x7">7 × 7 (49조각)</option>
             </select>
 
             <label className="flex items-center gap-2 text-sm">
@@ -961,9 +1044,7 @@ useEffect(() => {
             </label>
 
             <button
-              onClick={() => {
-                shuffle()
-              }}
+              onClick={shuffle}
               className="rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!imageUrl}
             >
@@ -1032,31 +1113,40 @@ useEffect(() => {
         {/* Board */}
         <div className="overflow-auto rounded-2xl border bg-neutral-100 p-4 shadow-md">
           <div
-            className="relative mx-auto select-none rounded-xl border bg-neutral-200"
+            className={styles.puzzleBoard}
             ref={boardRef}
             style={{
               width: outerRect.w,
               height: outerRect.h,
               transform: `scale(${boardScale})`,
               transformOrigin: 'top left',
-            }}
+              '--bg-opacity': bgOpacity,
+              '--bg-filter': bgBlur ? 'blur(2px) brightness(0.9) saturate(0.95)' : 'none',
+            } as React.CSSProperties}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
           >
             {/* Play area background */}
             {imageUrl && (
               <div
-                className="absolute overflow-hidden rounded-xl"
+                className={styles.playArea}
                 style={{
-                  left: playX, top: playY, width: playW, height: playH,
-                  opacity: bgOpacity,
-                  filter: bgBlur ? 'blur(2px) brightness(0.9) saturate(0.95)' : 'none',
+                  left: playX, 
+                  top: playY, 
+                  width: playW, 
+                  height: playH
                 }}
               >
                 <img
                   src={imageUrl}
                   alt="puzzle background"
-                  style={{ position: 'absolute', left: offsetX, top: offsetY, width: renderWidth, height: renderHeight }}
+                  style={{ 
+                    position: 'absolute', 
+                    left: offsetX, 
+                    top: offsetY, 
+                    width: renderWidth, 
+                    height: renderHeight 
+                  }}
                   onLoad={(e) => {
                     const img = e.currentTarget
                     setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight })
@@ -1072,7 +1162,7 @@ useEffect(() => {
 
             {/* 퍼즐 조각 모양 가이드 */}
             {imageUrl && showPieceShapes && (
-              <div className="pointer-events-none absolute" style={{ left: playX, top: playY, width: playW, height: playH }}>
+              <div className={styles.shapeGuides} style={{ left: playX, top: playY, width: playW, height: playH }}>
                 <svg width={playW} height={playH} viewBox={`0 0 ${playW} ${playH}`} className="absolute inset-0">
                   {range(rows).flatMap((r) =>
                     range(cols).map((c) => {
@@ -1097,30 +1187,18 @@ useEffect(() => {
                               y={slotY - magnetRange / 4}
                               width={tileW + magnetRange / 2}
                               height={tileH + magnetRange / 2}
-                              fill="rgba(59,130,246,0.1)"
-                              stroke="rgba(59,130,246,0.3)"
-                              strokeWidth="1"
-                              rx="4"
-                              className="animate-pulse"
+                              className={styles.magnetZone}
                             />
                           )}
                           <path
                             d={pathD}
                             transform={`translate(${slotX}, ${slotY})`}
-                            fill="none"
-                            stroke={showMagnetZone ? 'rgba(59,130,246,0.9)' : 'rgba(255,255,255,0.8)'}
-                            strokeWidth={showMagnetZone ? 3 : 2}
-                            strokeDasharray={showMagnetZone ? '6,2' : '8,4'}
-                            className={showMagnetZone ? 'animate-pulse' : ''}
+                            className={`${styles.guidePath} ${showMagnetZone ? styles.active : styles.inactive}`}
                           />
                           <path
                             d={pathD}
                             transform={`translate(${slotX}, ${slotY})`}
-                            fill="none"
-                            stroke="rgba(0,0,0,0.3)"
-                            strokeWidth={1}
-                            strokeDasharray="8,4"
-                            strokeDashoffset={2}
+                            className={`${styles.guidePath} ${styles.shadow}`}
                           />
                         </g>
                       )
@@ -1133,51 +1211,51 @@ useEffect(() => {
             {/* 이미지 없음/로딩 중 안내 */}
             {!imageUrl && (
               <div
-                className="absolute flex items-center justify-center rounded-xl border-2 border-dashed border-gray-400 bg-gray-100"
+                className={`${styles.loadingContainer} ${styles.loadingEmpty}`}
                 style={{ left: playX, top: playY, width: playW, height: playH }}
               >
-                <div className="text-center text-gray-500">
-                  <div className="mb-2 text-4xl">📷</div>
-                  <div className="text-sm">이미지를 업로드하거나</div>
-                  <div className="text-sm">프리셋을 선택해주세요</div>
+                <div className={styles.loadingContent}>
+                  <div className={`${styles.loadingIcon} ${styles.loadingIconEmpty}`}>📷</div>
+                  <div className={`${styles.loadingText} ${styles.loadingTextEmpty}`}>이미지를 업로드하거나</div>
+                  <div className={`${styles.loadingText} ${styles.loadingTextEmpty}`}>프리셋을 선택해주세요</div>
                 </div>
               </div>
             )}
 
             {imageUrl && !imageLoaded && (
               <div
-                className="absolute flex items-center justify-center rounded-xl border-2 border-dashed border-blue-400 bg-blue-50"
+                className={`${styles.loadingContainer} ${styles.loadingActive}`}
                 style={{ left: playX, top: playY, width: playW, height: playH }}
               >
-                <div className="text-center text-blue-500">
-                  <div className="mb-2 animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                  <div className="text-sm">이미지 로딩 중...</div>
-                  <div className="text-xs text-blue-400 mt-1">잠시만 기다려주세요</div>
+                <div className={styles.loadingContent}>
+                  <div className={`${styles.loadingIcon} ${styles.loadingIconActive}`}></div>
+                  <div className={`${styles.loadingText} ${styles.loadingTextActive}`}>이미지 로딩 중...</div>
+                  <div className={styles.loadingSubtext}>잠시만 기다려주세요</div>
                 </div>
               </div>
             )}
 
             {/* Play area border */}
             <div
-              className="absolute rounded-xl border-2 border-dashed"
-              style={{ left: playX, top: playY, width: playW, height: playH, borderColor: 'rgba(0,0,0,0.35)' }}
+              className={styles.playAreaBorder}
+              style={{ left: playX, top: playY, width: playW, height: playH }}
             />
 
             {/* Grid guide */}
             {showGuides && (
-              <div className="pointer-events-none absolute" style={{ left: playX, top: playY, width: playW, height: playH }}>
+              <div className={styles.gridGuides} style={{ left: playX, top: playY, width: playW, height: playH }}>
                 {range(rows + 1).map((r) => (
                   <div
                     key={`r-${r}`}
-                    className="absolute left-0 right-0 border-t"
-                    style={{ top: r * tileH, borderColor: 'rgba(255,255,255,0.55)' }}
+                    className={`${styles.gridLine} ${styles.gridLineHorizontal}`}
+                    style={{ top: r * tileH }}
                   />
                 ))}
                 {range(cols + 1).map((c) => (
                   <div
                     key={`c-${c}`}
-                    className="absolute top-0 bottom-0 border-l"
-                    style={{ left: c * tileW, borderColor: 'rgba(255,255,255,0.55)' }}
+                    className={`${styles.gridLine} ${styles.gridLineVertical}`}
+                    style={{ left: c * tileW }}
                   />
                 ))}
               </div>
@@ -1201,13 +1279,12 @@ useEffect(() => {
                     key={t.id}
                     role="button"
                     aria-label={`tile-${t.id}`}
-                    className="absolute cursor-grab touch-none"
+                    className={`${styles.puzzleTile} ${t.locked ? styles.locked : ''}`}
                     style={{
                       left: t.x - pad,
                       top:  t.y - pad,
                       width:  tileW + pad * 2,
                       height: tileH + pad * 2,
-                      zIndex: t.locked ? 1 : 2,
                     }}
                     onPointerDown={(e) => onPointerDown(e, t.id)}
                     onWheel={(e) => onWheel(e, t.id)}
@@ -1242,51 +1319,43 @@ useEffect(() => {
 
             {/* Completion popup */}
             {solved && (
-              <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
-                <div className="relative">
-                  <div className="fixed inset-0 animate-pulse bg-black/70 backdrop-blur-sm" style={{ animation: 'fadeIn 0.5s ease-out' }} />
-                  <div
-                    className="relative rounded-2xl border-4 border-yellow-300 bg-gradient-to-br from-yellow-200 via-orange-200 to-pink-200 p-8 shadow-2xl"
-                    style={{
-                      animation: 'celebration 1s ease-out',
-                      transform: 'scale(1.05)',
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.3), 0 0 20px rgba(255,215,0,0.5)',
-                    }}
-                  >
-                    <div className="text-center">
-                      <div className="mb-4 text-6xl animate-bounce">🎉✨🏆✨🎉</div>
-                      <div className="mb-3 text-3xl font-bold text-gray-800">퍼즐 완성!</div>
-                      <div className="mb-2 text-xl text-gray-700">축하합니다</div>
-                      <div className="mb-4 rounded-lg bg-white/80 p-3 backdrop-blur-sm">
-                        <div className="text-lg font-semibold text-gray-800">⏱ 완료 시간: {elapsed.toFixed(1)}초</div>
-                        <div className="text-sm text-gray-600">
-                          {Math.floor(elapsed / 60)}분 {Math.floor(elapsed % 60)}초
-                        </div>
+              <div className={styles.completionOverlay}>
+                <div className={styles.completionBackdrop} />
+                <div className={styles.completionPopup}>
+                  <div className="text-center">
+                    <div className={styles.completionEmojis}>🎉✨🏆✨🎉</div>
+                    <div className={styles.completionTitle}>퍼즐 완성!</div>
+                    <div className={styles.completionSubtitle}>축하합니다</div>
+                    <div className={styles.completionTime}>
+                      <div className={styles.completionTimeMain}>⏱ 완료 시간: {elapsed.toFixed(1)}초</div>
+                      <div className={styles.completionTimeDetail}>
+                        {Math.floor(elapsed / 60)}분 {Math.floor(elapsed % 60)}초
                       </div>
+                    </div>
+                    <div className={styles.completionButtons}>
                       <button
                         onClick={() => {
                           shuffle()
                           setElapsed(0)
                         }}
-                        className="transform rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-3 text-lg font-semibold text-white shadow-lg transition-all duration-200 hover:scale-105 hover:from-blue-600 hover:to-purple-700 hover:shadow-xl"
-                        style={{ pointerEvents: 'auto' }}
+                        className={`${styles.completionButton} ${styles.completionButtonPrimary}`}
                       >
-                        🎯 새 게임 시작하기
+                        🎯 다시하기
+                      </button>
+                      <button
+                        onClick={() => {
+                          window.location.href = '/'
+                        }}
+                        className={`${styles.completionButton} ${styles.completionButtonSecondary}`}
+                      >
+                        🏠 홈으로 가기
                       </button>
                     </div>
-                    <div className="absolute -top-2 -right-2 text-2xl text-yellow-400 animate-spin" style={{ animationDuration: '3s' }}>
-                      ⭐
-                    </div>
-                    <div className="absolute -top-1 -left-3 text-xl text-yellow-300 animate-bounce" style={{ animationDelay: '0.5s' }}>
-                      ✨
-                    </div>
-                    <div className="absolute -bottom-2 -right-3 text-xl text-pink-400 animate-pulse" style={{ animationDelay: '1s' }}>
-                      💫
-                    </div>
-                    <div className="absolute -bottom-1 -left-2 text-lg text-orange-400 animate-bounce" style={{ animationDelay: '1.5s' }}>
-                      🌟
-                    </div>
                   </div>
+                  <div className={styles.decorationStar}>⭐</div>
+                  <div className={styles.decorationSparkle}>✨</div>
+                  <div className={styles.decorationSparkle}>💫</div>
+                  <div className={styles.decorationSparkle}>🌟</div>
                 </div>
               </div>
             )}
