@@ -166,17 +166,6 @@ export default function HomePage() {
               다양한 아름다운 이미지로 퍼즐을 만들고, 4단계 난이도로 도전해보세요.
               컬러와 흑백 퍼즐 중에서 선택할 수 있습니다!
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/puzzle"
-                className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-lg font-semibold text-gray-900 hover:bg-gray-100 transition-colors"
-              >
-                🎯 지금 시작하기
-              </Link>
-              <button className="inline-flex items-center justify-center rounded-xl border-2 border-white px-8 py-4 text-lg font-semibold text-white hover:bg-white hover:text-gray-900 transition-colors">
-                📷 내 이미지 업로드
-              </button>
-            </div>
           </div>
         </div>
       </section>
