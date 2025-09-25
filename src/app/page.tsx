@@ -31,12 +31,31 @@ const DIFFICULTIES: Array<{ pieces: number; label: string; color: string }> = [
   { pieces: 36, label: '4단계', color: 'bg-red-100 text-red-800' },
 ]
 
+/** ---------------- Utils ---------------- */
+// 클라이언트 사이드에서 배열을 랜덤하게 섞는 함수
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
+// 추천 퍼즐을 선별하는 함수
+function getRecommendedPuzzles(puzzles: PuzzleImage[], count: number = 6): PuzzleImage[] {
+  const shuffled = shuffleArray(puzzles)
+  return shuffled.slice(0, count)
+}
+
 export default function HomePage() {
   const [categoryType, setCategoryType] = useState<'color' | 'gray'>('color')
   const [selectedDifficulty, setSelectedDifficulty] = useState<number>(0)
   const [puzzleImages, setPuzzleImages] = useState<PuzzleImage[]>([])
+  const [recommendedPuzzles, setRecommendedPuzzles] = useState<PuzzleImage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [recommendationSeed, setRecommendationSeed] = useState(0) // 추천 퍼즐 갱신용
 
   /** API에서 퍼즐 데이터 가져오기 */
   const fetchPuzzles = async (signal?: AbortSignal) => {
@@ -70,6 +89,20 @@ export default function HomePage() {
     }
   }
 
+  /** 추천 퍼즐 업데이트 */
+  const updateRecommendations = () => {
+    if (puzzleImages.length > 0) {
+      const recommended = getRecommendedPuzzles(puzzleImages)
+      setRecommendedPuzzles(recommended)
+    }
+  }
+
+  /** 추천 퍼즐 새로고침 */
+  const refreshRecommendations = () => {
+    setRecommendationSeed(Date.now())
+    updateRecommendations()
+  }
+
   /** 마운트/필터 변경 시 데이터 가져오기 (요청 취소 포함) */
   useEffect(() => {
     const ac = new AbortController()
@@ -78,11 +111,22 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryType, selectedDifficulty])
 
+  /** 퍼즐 데이터가 변경될 때 추천 퍼즐 업데이트 */
+  useEffect(() => {
+    updateRecommendations()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puzzleImages, recommendationSeed])
+
   /** 카테고리 변경 */
   const handleCategoryChange = (newCategory: 'color' | 'gray') => {
     setCategoryType(newCategory)
     setSelectedDifficulty(0) // 난이도 초기화
   }
+
+  /** 컴포넌트 마운트 시 초기 추천 시드 설정 */
+  useEffect(() => {
+    setRecommendationSeed(Date.now())
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -134,6 +178,113 @@ export default function HomePage() {
               </button>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Recommended Puzzles Section */}
+      <section className="py-12 bg-gradient-to-r from-purple-50 to-pink-50 border-b">
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="text-2xl">✨</div>
+                <h3 className="text-2xl font-bold text-gray-900">오늘의 추천 퍼즐</h3>
+              </div>
+              <div className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full font-medium">
+                매일 새로운 추천
+              </div>
+            </div>
+            <button
+              onClick={refreshRecommendations}
+              disabled={loading || recommendedPuzzles.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
+              title="새로운 추천 퍼즐 보기"
+            >
+              🔄 새로운 추천
+            </button>
+          </div>
+
+          {/* 추천 퍼즐 로딩 */}
+          {loading && (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+              <span className="ml-3 text-gray-600">추천 퍼즐을 준비중...</span>
+            </div>
+          )}
+
+          {/* 추천 퍼즐 그리드 */}
+          {!loading && recommendedPuzzles.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {recommendedPuzzles.map((puzzle, index) => (
+                <div
+                  key={`rec-${puzzle.id}-${recommendationSeed}`}
+                  className="group relative overflow-hidden rounded-xl bg-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105"
+                  style={{ 
+                    animationDelay: `${index * 100}ms`,
+                    animation: 'fadeInScale 0.6s ease-out forwards'
+                  }}
+                >
+                  <div className="aspect-square overflow-hidden relative">
+                    <img
+                      src={puzzle.url}
+                      alt={`추천 퍼즐 #${puzzle.id}`}
+                      className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.currentTarget
+                        target.onerror = null
+                        target.src = `https://via.placeholder.com/300x300/cccccc/666666?text=퍼즐+${puzzle.id}`
+                      }}
+                    />
+                    {/* 추천 배지 */}
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
+                      ⭐ 추천
+                    </div>
+                    {/* 순위 배지 */}
+                    <div className="absolute top-2 right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full font-bold">
+                      #{index + 1}
+                    </div>
+                    {/* 호버 오버레이 */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                        <Link
+                          href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=16`}
+                          className="bg-white text-gray-900 px-4 py-2 rounded-lg font-medium text-sm hover:bg-gray-100 transition-colors"
+                        >
+                          🧩 플레이
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <h4 className="font-medium text-gray-900 text-sm mb-2">퍼즐 #{puzzle.id}</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {puzzle.difficulty.slice(0, 2).map((pieces, diffIndex) => (
+                        <Link
+                          key={pieces}
+                          href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=${pieces}`}
+                          className={`px-2 py-1 rounded text-xs transition-colors hover:scale-105 ${
+                            diffIndex === 0
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          }`}
+                        >
+                          {pieces}조각
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && recommendedPuzzles.length === 0 && (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-2">🎭</div>
+              <p className="text-gray-600">추천할 퍼즐을 준비중입니다...</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -247,10 +398,14 @@ export default function HomePage() {
           {/* 그리드 */}
           {!loading && !error && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {puzzleImages.map((puzzle) => (
+              {puzzleImages.map((puzzle, index) => (
                 <div
-                  key={puzzle.id}
+                  key={`${puzzle.id}`}
                   className="group relative overflow-hidden rounded-xl bg-white shadow-md hover:shadow-lg transition-all duration-200"
+                  style={{ 
+                    animationDelay: `${index * 50}ms`,
+                    animation: 'fadeInUp 0.5s ease-out forwards'
+                  }}
                 >
                   <div className="aspect-square overflow-hidden">
                     <img
@@ -268,16 +423,16 @@ export default function HomePage() {
                   <div className="p-4">
                     <h4 className="font-medium text-gray-900 mb-2">퍼즐 #{puzzle.id}</h4>
                     <div className="flex flex-wrap gap-1 mb-3">
-                      {puzzle.difficulty.map((pieces, index) => (
+                      {puzzle.difficulty.map((pieces, diffIndex) => (
                         <Link
                           key={pieces}
                           href={`/puzzle?image=${encodeURIComponent(puzzle.url)}&id=${puzzle.id}&difficulty=${pieces}`}
                           className={`px-2 py-1 rounded text-xs transition-colors hover:scale-105 ${
-                            index === 0
+                            diffIndex === 0
                               ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : index === 1
+                              : diffIndex === 1
                               ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                              : index === 2
+                              : diffIndex === 2
                               ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                               : 'bg-red-100 text-red-700 hover:bg-red-200'
                           }`}
@@ -307,7 +462,7 @@ export default function HomePage() {
             <div className="text-center py-12">
               <div className="text-6xl mb-4">🔍</div>
               <h4 className="text-xl font-semibold text-gray-900 mb-2">해당 조건의 퍼즐이 없습니다</h4>
-              <p className="text-gray-600">다른 난이도를 선택하거나 퍼즐 타입을 변경해보세요.</p>
+              <p className="text-gray-600 mb-4">다른 난이도를 선택하거나 퍼즐 타입을 변경해보세요.</p>
             </div>
           )}
         </div>
@@ -331,8 +486,8 @@ export default function HomePage() {
               <div className="text-gray-300">난이도 단계</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">18</div>
-              <div className="text-gray-300">총 퍼즐</div>
+              <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-2">6</div>
+              <div className="text-gray-300">매일 추천</div>
             </div>
           </div>
         </div>
@@ -351,6 +506,30 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes fadeInScale {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
     </div>
   )
 }
