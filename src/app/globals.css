@@ -1,8 +1,15 @@
-/* src/app/globals.css - 전역 스타일 (기존 파일 업데이트) */
+/* src/app/globals.css - 전역 스타일 (SUIT Variable 폰트 포함) */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 전역 폰트 적용 - !important로 강제 적용 */
+@layer base {
+  * {
+    font-family: 'SUIT Variable', -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  }
+}
 
 /* 기본 애니메이션들 */
 @keyframes fadeIn {
