@@ -220,29 +220,53 @@ type SfxApi = {
 function useSfx(): SfxApi {
   const ctxRef = useRef<AudioContext | null>(null)
   const gainRef = useRef<GainNode | null>(null)
+  const celebrationAudioRef = useRef<HTMLAudioElement | null>(null)
   const [enabled, setEnabled] = useState(true)
   const [volume, setVolume] = useState(0.6)
 
-const ensureCtx = () => {
-  if (!ctxRef.current) {
-    const AC: typeof AudioContext | undefined =
-      (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).AudioContext ??
-      (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  const ensureCtx = () => {
+    if (!ctxRef.current) {
+      const AC: typeof AudioContext | undefined =
+        (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).AudioContext ??
+        (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
 
-    if (!AC) return null
-    const ctx: AudioContext = new AC()
-    const g = ctx.createGain()
-    g.gain.value = volume
-    g.connect(ctx.destination)
-    ctxRef.current = ctx
-    gainRef.current = g
+      if (!AC) return null
+      const ctx: AudioContext = new AC()
+      const g = ctx.createGain()
+      g.gain.value = volume
+      g.connect(ctx.destination)
+      ctxRef.current = ctx
+      gainRef.current = g
+    }
+    if (ctxRef.current!.state === 'suspended') ctxRef.current!.resume()
+    return ctxRef.current
   }
-  if (ctxRef.current!.state === 'suspended') ctxRef.current!.resume()
-  return ctxRef.current
-}
 
   useEffect(() => {
     if (gainRef.current) gainRef.current.gain.value = volume
+  }, [volume])
+
+  // 음원 파일 로드
+  useEffect(() => {
+    // HTML Audio 엘리먼트 생성 및 미리 로드
+    const audio = new Audio('/sounds/MP_3.mp3')
+    audio.volume = volume
+    audio.preload = 'auto'
+    celebrationAudioRef.current = audio
+    
+    return () => {
+      if (celebrationAudioRef.current) {
+        celebrationAudioRef.current.pause()
+        celebrationAudioRef.current = null
+      }
+    }
+  }, [])
+
+  // 볼륨 변경 시 오디오 볼륨도 업데이트
+  useEffect(() => {
+    if (celebrationAudioRef.current) {
+      celebrationAudioRef.current.volume = volume
+    }
   }, [volume])
 
   const env = (startTime: number, node: GainNode, dur: number, a = 0.005, r = 0.08, peak = 1) => {
@@ -272,109 +296,127 @@ const ensureCtx = () => {
   const rotateFx = () => pluck(420, 0.09, 'square')
   const shuffleFx = () => { pluck(260, 0.08, 'square'); pluck(330, 0.08, 'square'); pluck(390, 0.08, 'square') }
   const errorFx = () => pluck(180, 0.18, 'sawtooth')
-const fanfare = () => {
-  if (!enabled) return
   
-  const grandStart = [131, 165, 196, 262, 330, 392, 523, 659, 784, 1047]
-  grandStart.forEach((freq, i) => {
-    setTimeout(() => {
-      pluck(freq, 0.4, 'sawtooth', 0)
-      pluck(freq * 1.5, 0.35, 'triangle', -5)
-      pluck(freq / 2, 0.45, 'sine', 8)
-    }, i * 20)
-  })
-  
-  setTimeout(() => {
-    const chord1 = [262, 330, 392, 523, 659, 784, 1047, 1319]
-    chord1.forEach((freq, i) => {
-      setTimeout(() => {
-        pluck(freq, 0.5, 'sawtooth', 0)
-        pluck(freq * 1.01, 0.45, 'triangle', -8)
-        pluck(freq * 2, 0.2, 'sine', -15)
-      }, i * 15)
-    })
+  // 음원 파일 재생 함수
+  const fanfare = () => {
+    if (!enabled) return
     
-    for (let i = 0; i < 20; i++) {
-      setTimeout(() => {
-        pluck(2000 + Math.random() * 3000, 0.12, 'sawtooth')
-      }, Math.random() * 150)
-    }
-  }, 200)
-  
-  setTimeout(() => {
-    const chord2 = [196, 247, 294, 392, 494, 587, 784, 988, 1175]
-    chord2.forEach((freq, i) => {
-      setTimeout(() => {
-        pluck(freq, 0.55, 'sawtooth', 0)
-        pluck(freq * 1.005, 0.5, 'triangle', -3)
-        pluck(freq / 2, 0.6, 'sine', 10)
-        pluck(freq * 3, 0.15, 'sine', -20)
-      }, i * 18)
-    })
-    
-    for (let i = 0; i < 35; i++) {
-      setTimeout(() => {
-        pluck(1500 + Math.random() * 4000, 0.1, 'sine')
-      }, Math.random() * 200)
-    }
-  }, 500)
-  
-  setTimeout(() => {
-    const massiveChord = [
-      65, 82, 98, 131, 165, 196, 220, 247, 262, 294, 330, 370, 392, 440, 
-      494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175, 1319, 1480, 1568
-    ]
-    
-    massiveChord.forEach((freq, i) => {
-      setTimeout(() => {
-        pluck(freq, 0.6, 'sawtooth', 0)
-        pluck(freq * 1.01, 0.55, 'triangle', -5)
-        if (i % 3 === 0) pluck(freq * 2, 0.3, 'sine', -12)
-        if (i % 5 === 0) pluck(freq / 2, 0.65, 'sine', 15)
-      }, i * 12)
-    })
-    
-    for (let i = 0; i < 50; i++) {
-      setTimeout(() => {
-        pluck(1000 + Math.random() * 5000, 0.08 + Math.random() * 0.05, 'sine')
-      }, Math.random() * 300)
-    }
-  }, 900)
-  
-  setTimeout(() => {
-    const ultimateChord = [
-      44, 55, 66, 88, 110, 131, 147, 165, 196, 220, 247, 262, 294, 330, 
-      370, 392, 440, 494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175, 
-      1319, 1480, 1568, 1760, 1976, 2093, 2349, 2637
-    ]
-    
-    ultimateChord.forEach((freq, i) => {
-      setTimeout(() => {
-        pluck(freq, 0.8, 'sawtooth', 0)
-        pluck(freq * 1.008, 0.75, 'triangle', -3)
-        pluck(freq * 1.012, 0.7, 'sine', -6)
-        if (i % 2 === 0) pluck(freq * 2, 0.4, 'sine', -10)
-        if (i % 4 === 0) pluck(freq / 2, 0.85, 'sine', 12)
-      }, i * 8)
-    })
-    
-    for (let i = 0; i < 80; i++) {
-      setTimeout(() => {
-        const sparkle = 800 + Math.random() * 6000
-        pluck(sparkle, 0.06 + Math.random() * 0.08, 'sine')
-      }, Math.random() * 500)
-    }
-    
-    setTimeout(() => {
-      [2093, 2349, 2637, 3136, 3520].forEach((freq, i) => {
-        setTimeout(() => {
-          pluck(freq, 1.0, 'sine', 0)
-          pluck(freq * 1.01, 0.9, 'triangle', -8)
-        }, i * 100)
+    if (celebrationAudioRef.current) {
+      // 음원 파일이 있으면 파일 재생
+      celebrationAudioRef.current.currentTime = 0
+      celebrationAudioRef.current.play().catch((err) => {
+        console.warn('음원 재생 실패:', err)
+        // 실패 시 폴백으로 기존 웹오디오 사운드 재생
+        playWebAudioFanfare()
       })
+    } else {
+      // 음원 파일이 없으면 웹오디오 사운드 재생
+      playWebAudioFanfare()
+    }
+  }
+  
+  // 기존 웹오디오 팬파레 (폴백용)
+  const playWebAudioFanfare = () => {
+    const grandStart = [131, 165, 196, 262, 330, 392, 523, 659, 784, 1047]
+    grandStart.forEach((freq, i) => {
+      setTimeout(() => {
+        pluck(freq, 0.4, 'sawtooth', 0)
+        pluck(freq * 1.5, 0.35, 'triangle', -5)
+        pluck(freq / 2, 0.45, 'sine', 8)
+      }, i * 20)
+    })
+    
+    setTimeout(() => {
+      const chord1 = [262, 330, 392, 523, 659, 784, 1047, 1319]
+      chord1.forEach((freq, i) => {
+        setTimeout(() => {
+          pluck(freq, 0.5, 'sawtooth', 0)
+          pluck(freq * 1.01, 0.45, 'triangle', -8)
+          pluck(freq * 2, 0.2, 'sine', -15)
+        }, i * 15)
+      })
+      
+      for (let i = 0; i < 20; i++) {
+        setTimeout(() => {
+          pluck(2000 + Math.random() * 3000, 0.12, 'sawtooth')
+        }, Math.random() * 150)
+      }
     }, 200)
-  }, 1400)
-}
+    
+    setTimeout(() => {
+      const chord2 = [196, 247, 294, 392, 494, 587, 784, 988, 1175]
+      chord2.forEach((freq, i) => {
+        setTimeout(() => {
+          pluck(freq, 0.55, 'sawtooth', 0)
+          pluck(freq * 1.005, 0.5, 'triangle', -3)
+          pluck(freq / 2, 0.6, 'sine', 10)
+          pluck(freq * 3, 0.15, 'sine', -20)
+        }, i * 18)
+      })
+      
+      for (let i = 0; i < 35; i++) {
+        setTimeout(() => {
+          pluck(1500 + Math.random() * 4000, 0.1, 'sine')
+        }, Math.random() * 200)
+      }
+    }, 500)
+    
+    setTimeout(() => {
+      const massiveChord = [
+        65, 82, 98, 131, 165, 196, 220, 247, 262, 294, 330, 370, 392, 440, 
+        494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175, 1319, 1480, 1568
+      ]
+      
+      massiveChord.forEach((freq, i) => {
+        setTimeout(() => {
+          pluck(freq, 0.6, 'sawtooth', 0)
+          pluck(freq * 1.01, 0.55, 'triangle', -5)
+          if (i % 3 === 0) pluck(freq * 2, 0.3, 'sine', -12)
+          if (i % 5 === 0) pluck(freq / 2, 0.65, 'sine', 15)
+        }, i * 12)
+      })
+      
+      for (let i = 0; i < 50; i++) {
+        setTimeout(() => {
+          pluck(1000 + Math.random() * 5000, 0.08 + Math.random() * 0.05, 'sine')
+        }, Math.random() * 300)
+      }
+    }, 900)
+    
+    setTimeout(() => {
+      const ultimateChord = [
+        44, 55, 66, 88, 110, 131, 147, 165, 196, 220, 247, 262, 294, 330, 
+        370, 392, 440, 494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175, 
+        1319, 1480, 1568, 1760, 1976, 2093, 2349, 2637
+      ]
+      
+      ultimateChord.forEach((freq, i) => {
+        setTimeout(() => {
+          pluck(freq, 0.8, 'sawtooth', 0)
+          pluck(freq * 1.008, 0.75, 'triangle', -3)
+          pluck(freq * 1.012, 0.7, 'sine', -6)
+          if (i % 2 === 0) pluck(freq * 2, 0.4, 'sine', -10)
+          if (i % 4 === 0) pluck(freq / 2, 0.85, 'sine', 12)
+        }, i * 8)
+      })
+      
+      for (let i = 0; i < 80; i++) {
+        setTimeout(() => {
+          const sparkle = 800 + Math.random() * 6000
+          pluck(sparkle, 0.06 + Math.random() * 0.08, 'sine')
+        }, Math.random() * 500)
+      }
+      
+      setTimeout(() => {
+        [2093, 2349, 2637, 3136, 3520].forEach((freq, i) => {
+          setTimeout(() => {
+            pluck(freq, 1.0, 'sine', 0)
+            pluck(freq * 1.01, 0.9, 'triangle', -8)
+          }, i * 100)
+        })
+      }, 200)
+    }, 1400)
+  }
 
   const prime = () => {
     const ctx = ensureCtx()
@@ -431,7 +473,7 @@ function PuzzleGameContent() {
   const boardRef = useRef<HTMLDivElement | null>(null)
   const [outerRect, setOuterRect] = useState({ w: 1100, h: 800 })
 
-  const playSize = Math.min(640, Math.max(400, Math.floor(Math.min(outerRect.w, outerRect.h) * 0.6)))
+  const playSize = Math.min(720, Math.max(400, Math.floor(Math.min(outerRect.w, outerRect.h) * 0.75)))
   const playW = playSize
   const playH = playSize
   const playX = Math.floor((outerRect.w - playW) / 2)
@@ -579,13 +621,20 @@ function PuzzleGameContent() {
     const update = () => {
       if (!boardRef.current) return
       const r = boardRef.current.getBoundingClientRect()
-      setOuterRect({ w: Math.round(r.width), h: Math.round(r.height) })
+      // Scale을 고려하여 실제 사용 가능한 크기 계산
+      const actualW = Math.round(r.width / boardScale)
+      const actualH = Math.round(r.height / boardScale)
+      setOuterRect({ w: actualW, h: actualH })
     }
     update()
     const ro = new ResizeObserver(update)
     if (boardRef.current) ro.observe(boardRef.current)
-    return () => ro.disconnect()
-  }, [])
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [boardScale])
 
   // 이미지가 로드되면 자동으로 섞기
   useEffect(() => {
@@ -593,6 +642,42 @@ function PuzzleGameContent() {
       shuffle()
     }
   }, [rows, cols, imageUrl, imageLoaded])
+
+  // 프리셋 이미지 목록
+  const presets = [
+    {
+      label: 'Vibrant Vibes',
+      url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop',
+    },
+    {
+      label: 'Mountains',
+      url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop',
+    },
+    {
+      label: 'City Night',
+      url: 'https://images.unsplash.com/photo-1482192596544-9eb780fc7f66?q=80&w=1600&auto=format&fit=crop',
+    },
+  ]
+
+  // 랜덤 퍼즐 로드 함수
+  const loadRandomPuzzle = () => {
+    const randomPreset = presets[Math.floor(Math.random() * presets.length)]
+    setImageUrl(randomPreset.url)
+    setPuzzleId('')
+    setImageLoaded(false)
+    setElapsed(0)
+    
+    // 랜덤 난이도 선택 (2x2, 3x3, 4x4, 6x6 중 하나)
+    const difficulties = [
+      { cols: 2, rows: 2 },
+      { cols: 3, rows: 3 },
+      { cols: 4, rows: 4 },
+      { cols: 6, rows: 6 },
+    ]
+    const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)]
+    setCols(randomDifficulty.cols)
+    setRows(randomDifficulty.rows)
+  }
 
   // 기본 이미지 (쿼리에서 안 온 경우에만)
   useEffect(() => {
@@ -895,21 +980,6 @@ function PuzzleGameContent() {
     }
   }
 
-  const presets = [
-    {
-      label: 'Vibrant Vibes',
-      url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop',
-    },
-    {
-      label: 'Mountains',
-      url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=1600&auto=format&fit=crop',
-    },
-    {
-      label: 'City Night',
-      url: 'https://images.unsplash.com/photo-1482192596544-9eb780fc7f66?q=80&w=1600&auto=format&fit=crop',
-    },
-  ]
-
   const piecePaths = useMemo(
     () => range(rows).flatMap((r) => range(cols).map((c) => buildPiecePath(tileW, tileH, edgesGrid[r][c], knob))),
     [rows, cols, tileW, tileH, edgesGrid, knob],
@@ -917,207 +987,238 @@ function PuzzleGameContent() {
 
   return (
     <div className="min-h-screen w-full bg-gray-50">
-      <div className="mx-auto max-w-[1400px] px-4 py-6">
-        <header className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-lg bg-black px-2 py-1 text-xs font-semibold text-white">
-              🧩 Puzzle {puzzleId && `#${puzzleId}`}
-            </div>
-            <div className="text-sm text-gray-600">{solved ? '완료!' : '진행 중'}</div>
-            <div className="text-sm tabular-nums text-gray-700">
-              ⏱ {elapsed.toFixed(1)}s {paused && '(일시정지)'}
-            </div>
-            <div className="text-xs text-gray-500">
-              완성: {tiles.filter((t) => t.locked).length}/{tiles.length}
-            </div>
-
-            {/* 🔊 SFX 컨트롤 */}
-            <div className="ml-2 flex items-center gap-2 rounded-md border bg-white px-2 py-1">
-              <label className="flex items-center gap-1 text-xs">
-                <input
-                  type="checkbox"
-                  checked={sfx.enabled}
-                  onChange={(e) => sfx.setEnabled(e.target.checked)}
-                />
-                효과음
-              </label>
-              <input
-                title="효과음 볼륨"
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={sfx.volume}
-                onChange={(e) => sfx.setVolume(Number(e.target.value))}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              이미지 업로드
-              <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-              <div className="rounded-md bg-blue-500 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-600">
-                {imageFile ? imageFile.name.slice(0, 20) + (imageFile.name.length > 20 ? '...' : '') : '파일 선택'}
+      {/* 모던한 헤더 */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
+        <div className="mx-auto max-w-[1400px] px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* 로고 및 홈 버튼 */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => window.location.href = '/'}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+              >
+                <span className="text-lg">🏠</span>
+                <span className="hidden sm:inline">홈으로</span>
+              </button>
+              
+              <div className="flex items-center gap-2">
+                <div className="text-2xl">🧩</div>
+                <div>
+                  <div className="font-bold text-gray-900">Puzzle Master</div>
+                  {puzzleId && (
+                    <div className="text-xs text-gray-500">퍼즐 #{puzzleId}</div>
+                  )}
+                </div>
               </div>
-            </label>
+            </div>
 
-            <select
-              className="rounded-md border px-2 py-1 text-sm"
-              value={`${cols}x${rows}`}
-              onChange={(e) => {
-                const [c, r] = e.target.value.split('x').map(Number)
-                setCols(c)
-                setRows(r)
-              }}
-            >
-              <option value="2x2">2 × 2 (4조각)</option>
-              <option value="3x3">3 × 3 (9조각)</option>
-              <option value="4x4">4 × 4 (16조각)</option>
-              <option value="6x6">6 × 6 (36조각)</option>
-              <option value="7x7">7 × 7 (49조각)</option>
-            </select>
+            {/* 상태 표시 */}
+            <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100">
+                <span className="text-sm font-medium text-gray-700">
+                  {solved ? '✅ 완료!' : '🎮 플레이 중'}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200">
+                <span className="text-lg">⏱</span>
+                <span className="text-sm font-bold text-blue-700 tabular-nums">
+                  {elapsed.toFixed(1)}s
+                </span>
+                {paused && <span className="text-xs text-blue-600">(일시정지)</span>}
+              </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              자석력
-              <input
-                type="number"
-                min={20}
-                max={80}
-                value={snapTolerance}
-                onChange={(e) => setSnapTolerance(Number(e.target.value))}
-                className="w-20 rounded-md border px-2 py-1 text-sm"
-              />
-            </label>
-
-            <label className="flex items-center gap-2 text-sm">
-              Scale
-              <input
-                type="range"
-                min={0.6}
-                max={1.4}
-                step={0.05}
-                value={boardScale}
-                onChange={(e) => setBoardScale(Number(e.target.value))}
-              />
-            </label>
-
-            <label className="flex items-center gap-2 text-sm">
-              배경 불투명도
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={bgOpacity}
-                onChange={(e) => setBgOpacity(Number(e.target.value))}
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={bgBlur} onChange={(e) => setBgBlur(e.target.checked)} />
-              배경 흐림
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={showPieceShapes}
-                onChange={(e) => setShowPieceShapes(e.target.checked)}
-              />
-              조각 모양 표시
-            </label>
-
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={edgesOnly} onChange={(e) => setEdgesOnly(e.target.checked)} />
-              Edges Only
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={rotationMode} onChange={(e) => setRotationMode(e.target.checked)} />
-              Rotation
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={captureMode} onChange={(e) => setCaptureMode(e.target.checked)} />
-              Capture
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={showGuides} onChange={(e) => setShowGuides(e.target.checked)} />
-              Guides
-            </label>
-
-            <button
-              onClick={shuffle}
-              className="rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!imageUrl}
-            >
-              섞기
-            </button>
-            <button onClick={() => setPaused((v) => !v)} className="rounded-lg border px-3 py-1.5 text-sm">
-              {paused ? '재개' : '일시정지'}
-            </button>
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200">
+                <span className="text-sm font-medium text-green-700">
+                  {tiles.filter((t) => t.locked).length}/{tiles.length}
+                </span>
+              </div>
+            </div>
           </div>
-        </header>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1400px] px-4 py-6">
+        {/* 컨트롤 패널 */}
+        <div className="mb-4 rounded-xl bg-white border border-gray-200 shadow-sm p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* 주요 액션 버튼들 */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={shuffle}
+                disabled={!imageUrl}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 text-white font-medium hover:from-orange-600 hover:to-red-600 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="text-lg">🔀</span>
+                <span>섞기</span>
+              </button>
+
+              <button
+                onClick={() => setPaused((v) => !v)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-all"
+              >
+                <span className="text-lg">{paused ? '▶️' : '⏸️'}</span>
+                <span>{paused ? '재개' : '일시정지'}</span>
+              </button>
+
+              <label className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium hover:from-green-600 hover:to-emerald-600 transition-all shadow-md hover:shadow-lg cursor-pointer">
+                <span className="text-lg">📁</span>
+                <span className="hidden sm:inline">
+                  {imageFile ? '파일 변경' : '이미지 업로드'}
+                </span>
+                <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+              </label>
+
+              <select
+                className="px-3 py-2 rounded-lg border-2 border-gray-300 bg-white text-sm font-medium hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                value={`${cols}x${rows}`}
+                onChange={(e) => {
+                  const [c, r] = e.target.value.split('x').map(Number)
+                  setCols(c)
+                  setRows(r)
+                }}
+              >
+                <option value="2x2">🧩 2×2 (4조각)</option>
+                <option value="3x3">🧩 3×3 (9조각)</option>
+                <option value="4x4">🧩 4×4 (16조각)</option>
+                <option value="6x6">🧩 6×6 (36조각)</option>
+                <option value="7x7">🧩 7×7 (49조각)</option>
+              </select>
+            </div>
+
+            {/* 설정 토글 */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sfx.enabled}
+                    onChange={(e) => sfx.setEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <span>🔊</span>
+                </label>
+                <input
+                  title="볼륨"
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={sfx.volume}
+                  onChange={(e) => sfx.setVolume(Number(e.target.value))}
+                  className="w-16"
+                />
+              </div>
+
+            </div>
+          </div>
+
+          {/* 고급 설정 (접을 수 있는 섹션) */}
+          <details className="mt-3 pt-3 border-t border-gray-200">
+            <summary className="text-sm font-medium text-gray-600 cursor-pointer hover:text-gray-900 flex items-center gap-2">
+              <span>⚙️</span>
+              <span>고급 설정</span>
+            </summary>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-gray-600">자석력 ({snapTolerance})</span>
+                <input
+                  type="range"
+                  min={20}
+                  max={80}
+                  value={snapTolerance}
+                  onChange={(e) => setSnapTolerance(Number(e.target.value))}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-gray-600">크기 ({(boardScale * 100).toFixed(0)}%)</span>
+                <input
+                  type="range"
+                  min={0.6}
+                  max={1.4}
+                  step={0.05}
+                  value={boardScale}
+                  onChange={(e) => setBoardScale(Number(e.target.value))}
+                  className="w-full"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-gray-600">배경 투명도</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={bgOpacity}
+                  onChange={(e) => setBgOpacity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </label>
+
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={bgBlur} onChange={(e) => setBgBlur(e.target.checked)} className="w-4 h-4 rounded" />
+                  배경 흐림
+                </label>
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={edgesOnly} onChange={(e) => setEdgesOnly(e.target.checked)} className="w-4 h-4 rounded" />
+                  테두리만 표시
+                </label>
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={captureMode} onChange={(e) => setCaptureMode(e.target.checked)} className="w-4 h-4 rounded" />
+                  다중 선택 모드
+                </label>
+              </div>
+            </div>
+          </details>
+        </div>
 
         {/* 선택된 이미지 정보 */}
-        {puzzleId && (
-          <div className="mb-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
-            <div className="text-sm text-blue-800">
-              🎯 선택된 퍼즐: <strong>#{puzzleId}</strong> ({rows}×{cols} = {rows * cols}조각)
+        {imageFile && (
+          <div className="mb-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-purple-800">
+                📷 업로드된 이미지: <strong>{imageFile.name}</strong>
+              </div>
+              <button
+                onClick={() => {
+                  setImageFile(null)
+                  setImageUrl('')
+                  setPuzzleId('')
+                  setImageLoaded(false)
+                }}
+                className="text-sm text-red-600 hover:text-red-800 font-medium"
+              >
+                ❌ 제거
+              </button>
             </div>
           </div>
         )}
 
         {/* 이미지 로딩 상태 */}
         {imageUrl && !imageLoaded && (
-          <div className="mb-3 rounded-lg bg-yellow-50 border border-yellow-200 px-3 py-2">
-            <div className="flex items-center gap-2 text-sm text-yellow-800">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
-              🖼️ 이미지 로딩 중...
+          <div className="mb-3 rounded-lg bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-600 border-t-transparent"></div>
+              <div className="text-sm text-yellow-800 font-medium">
+                🖼️ 이미지 로딩 중...
+              </div>
             </div>
           </div>
         )}
-
-        <div className="mb-3 flex flex-wrap gap-2">
-          {!imageFile &&
-            presets.map((p) => (
-              <button
-                key={p.label}
-                onClick={() => {
-                  setImageUrl(p.url)
-                  setPuzzleId('')
-                  setImageLoaded(false)
-                }}
-                className={`rounded-md border px-2 py-1 text-sm ${
-                  imageUrl === p.url ? 'bg-gray-900 text-white' : 'hover:bg-gray-100'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          {imageFile && (
-            <button
-              onClick={() => {
-                setImageFile(null)
-                setImageUrl('')
-                setPuzzleId('')
-                setImageLoaded(false)
-              }}
-              className="rounded-md border border-red-300 px-2 py-1 text-sm text-red-600 hover:bg-red-50"
-            >
-              업로드한 이미지 제거
-            </button>
-          )}
-          <div className="text-xs text-gray-500">
-            단축키: c(캡처), r(섞기), p(타이머), g(가이드), s(조각모양), ←/→(회전)
-          </div>
-        </div>
-
         {/* Board */}
-        <div className="overflow-auto rounded-2xl border bg-neutral-100 p-4 shadow-md">
+        <div className="rounded-2xl border bg-neutral-100 shadow-md overflow-hidden">
           <div
             className={styles.puzzleBoard}
             ref={boardRef}
             style={{
-              width: outerRect.w,
-              height: outerRect.h,
+              width: '100%',
+              height: '75vh',
+              maxHeight: '800px',
+              minHeight: '500px',
               transform: `scale(${boardScale})`,
               transformOrigin: 'top left',
               '--bg-opacity': bgOpacity,
@@ -1341,6 +1442,12 @@ function PuzzleGameContent() {
                         className={`${styles.completionButton} ${styles.completionButtonPrimary}`}
                       >
                         🎯 다시하기
+                      </button>
+                      <button
+                        onClick={loadRandomPuzzle}
+                        className={`${styles.completionButton} ${styles.completionButtonTertiary}`}
+                      >
+                        🧩 다른 퍼즐 시작
                       </button>
                       <button
                         onClick={() => {
