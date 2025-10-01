@@ -141,18 +141,14 @@ export default function HomePage() {
             <div className={styles.headerLogo}>
               <div className={styles.headerLogoIcon}>
                 <div className="text-2xl">🧩</div>
-                <h1 className={styles.headerLogoText}>Puzzle Master</h1>
+                <img 
+                  src="/icons/logo_mindring.png" 
+                  alt="Puzzle Master Logo" 
+                  className={styles.headerLogoImage}
+                />
               </div>
               <div className={styles.headerSubtitle}>온라인 직소퍼즐 게임</div>
             </div>
-            <nav className={styles.headerNav}>
-              <Link href="/puzzle" className={styles.headerNavLink}>
-                퍼즐 플레이
-              </Link>
-              <button className={styles.headerUploadButton}>
-                이미지 업로드
-              </button>
-            </nav>
           </div>
         </div>
       </header>
@@ -160,15 +156,18 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className={styles.hero}>
         <div className={styles.heroContainer}>
-          <div className={styles.heroContent}>
+                    <div className={styles.heroContent}>
+                                  <p className={styles.heroDescription}>
+                            함께하는 시간이, 인생을 젊나게 합니다
+            </p>
             <h2 className={styles.heroTitle}>
-              직소퍼즐의 즐거움을
-              <br />
-              온라인에서 경험하세요
+
+              마음과 기억을 이어주는 따뜻한 연결, 오늘도 당신 곁에 있습니다.
             </h2>
-            <p className={styles.heroDescription}>
-              다양한 아름다운 이미지로 퍼즐을 만들고, 4단계 난이도로 도전해보세요.
-              컬러와 흑백 퍼즐 중에서 선택할 수 있습니다!
+
+            <p className={styles.heroSubtext}>
+              다양한 아름다운 이미지를 퍼즐로 즐겨보세요.<br />
+              4단계 난이도로 도전할 수 있으며, 컬러와 흑백 퍼즐 중 원하는 이미지로 선택할 수 있어요.
             </p>
           </div>
         </div>

@@ -37,6 +37,18 @@
   color: rgb(17 24 39);
 }
 
+.headerLogoImage {
+  height: 2rem;
+  width: auto;
+  object-fit: contain;
+}
+
+@media (min-width: 768px) {
+  .headerLogoImage {
+    height: 1.5rem;
+  }
+}
+
 .headerSubtitle {
   display: none;
   font-size: 0.875rem;
@@ -106,22 +118,38 @@
 
 @media (min-width: 768px) {
   .heroTitle {
-    font-size: 3.75rem;
+    font-size: 2.5rem;
   }
 }
 
 .heroDescription {
   font-size: 1.25rem;
   color: rgb(191 219 254);
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   max-width: 48rem;
   margin-left: auto;
   margin-right: auto;
+  font-weight: 500;
 }
 
 @media (min-width: 768px) {
   .heroDescription {
     font-size: 1.5rem;
+  }
+}
+
+.heroSubtext {
+  font-size: 0.95rem;
+  color: rgb(224 242 254);
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+@media (min-width: 768px) {
+  .heroSubtext {
+    font-size: 1rem;
   }
 }
 
