@@ -158,7 +158,7 @@ export default function HomePage() {
         <div className={styles.heroContainer}>
                     <div className={styles.heroContent}>
                                   <p className={styles.heroDescription}>
-                            함께하는 시간이, 인생을 젊나게 합니다
+                            함께하는 시간이, 인생을 빛나게 합니다
             </p>
             <h2 className={styles.heroTitle}>
 
