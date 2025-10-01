@@ -140,7 +140,6 @@ export default function HomePage() {
           <div className={styles.headerContent}>
             <div className={styles.headerLogo}>
               <div className={styles.headerLogoIcon}>
-                <div className="text-2xl">🧩</div>
                 <img 
                   src="/icons/logo_mindring.png" 
                   alt="Puzzle Master Logo" 
